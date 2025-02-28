@@ -1,0 +1,56 @@
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin
+testbin/*
+Dockerfile.cross
+.local_test.py
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Generated CRDs
+charts/weka-operator/crds/*
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+*.tgz
+node_modules
+.semrel
+semantic-release
+
+dist/
+charts/weka-operator-*-SNAPSHOT
+charts/weka-operator/templates/operator.yaml
+config/rbac/role.yaml
+.terraform
+.direnv
+temp.json
+k3s*.yaml
+/drivers
+cover.html
+*.pyc
+mock_*.go
+prog.bin
+.envrc.private
+.aider*
+.VERSION
+go.work*
+.envrc.private
+.vscode
+*.orig
