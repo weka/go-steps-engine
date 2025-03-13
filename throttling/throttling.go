@@ -55,7 +55,12 @@ func (tsm *ThrottlingSyncMap) ShouldRun(key string, s *ThrottlingSettings) bool 
 		newTime := time.Now().Add(-randomPreSetInterval)
 		// even if some other time set in parallel - safe to assume it would not allow us to run
 		tsm.syncMap.LoadOrStore(partKey, newTime)
+
 		return false
+	} else if !s.EnsureStepSuccess {
+		tsm.SetNow(key)
+
+		return true
 	}
 
 	return true
