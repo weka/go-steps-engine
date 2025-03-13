@@ -7,8 +7,9 @@ import (
 
 	"go.opentelemetry.io/otel/codes"
 
-	"github.com/weka/go-steps-engine/throttling"
 	"github.com/weka/go-weka-observability/instrumentation"
+
+	"github.com/weka/go-steps-engine/throttling"
 )
 
 type StepFunc func(ctx context.Context) error
@@ -107,7 +108,7 @@ STEPS:
 		}
 
 		// Throttling handling
-		if step.IsThrottled() && r.Object != nil && r.Throttler != nil {
+		if step.IsThrottled() && r.Throttler != nil {
 			if !r.Throttler.ShouldRun(step.GetName(), step.GetThrottlingSettings()) {
 				continue STEPS
 			}
@@ -167,7 +168,6 @@ STEPS:
 			}
 
 			err := r.Object.SetConditionTrue(stepCtx, condition)
-
 			if err != nil {
 				stepEnd()
 				stopErr := &StepRunError{Err: err, Subject: r.Object, Step: step}
