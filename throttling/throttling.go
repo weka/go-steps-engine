@@ -15,6 +15,8 @@ type ThrottlingSettings struct {
 	// will update the timestamp on ThrottlingMap only if the step succeeded
 	// (disabled by default)
 	EnsureStepSuccess bool
+	// (optional) override partition key for the throttler
+	PartitionKeyOverride *string
 }
 
 type ThrottlingSyncMap struct {

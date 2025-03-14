@@ -109,7 +109,14 @@ STEPS:
 
 		// Throttling handling
 		if step.IsThrottled() && r.Throttler != nil {
-			if !r.Throttler.ShouldRun(step.GetName(), step.GetThrottlingSettings()) {
+			throttlingSettings := step.GetThrottlingSettings()
+
+			key := step.GetName()
+			if throttlingSettings.PartitionKeyOverride != nil {
+				key = *throttlingSettings.PartitionKeyOverride
+			}
+
+			if !r.Throttler.ShouldRun(key, throttlingSettings) {
 				continue STEPS
 			}
 		}
@@ -184,8 +191,14 @@ STEPS:
 			return nil
 		}
 
-		if step.IsThrottled() && step.GetThrottlingSettings().EnsureStepSuccess {
-			r.Throttler.SetNow(step.GetName())
+		throttlingSettings := step.GetThrottlingSettings()
+		if step.IsThrottled() && throttlingSettings.EnsureStepSuccess {
+			key := step.GetName()
+			if throttlingSettings.PartitionKeyOverride != nil {
+				key = *throttlingSettings.PartitionKeyOverride
+			}
+
+			r.Throttler.SetNow(key)
 		}
 	}
 	return nil
