@@ -2,12 +2,13 @@ package lifecycle
 
 import (
 	"context"
-	"errors"
+	stderrors "errors"
 	"fmt"
+	"time"
 
 	"go.opentelemetry.io/otel/codes"
-
 	"github.com/weka/go-weka-observability/instrumentation"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/weka/go-steps-engine/throttling"
 )
@@ -129,7 +130,7 @@ STEPS:
 			// if the error is not expected error, we should stop the reconciliation,
 			// otherwise - continue to the next step
 			var expectedError *ExpectedError
-			if errors.As(err, &expectedError) {
+			if stderrors.As(err, &expectedError) {
 				stepLogger.Error(err, "Expected error running step")
 				stepEnd()
 
@@ -214,4 +215,45 @@ func ForceNoError(f StepFunc) StepFunc {
 		}
 		return nil
 	}
+}
+
+func (r *StepsEngine) RunAsReconcilerResponse(ctx context.Context) (ctrl.Result, error) {
+	ctx, logger, end := instrumentation.GetLogSpan(ctx, "")
+	defer end()
+
+	err := r.Run(ctx)
+	if err != nil {
+		// check if the error is WaitError or AbortError, then return without error, but with 3 seconds wait
+		var lastUnpacked *StepRunError
+		var unpackTarget error
+		unpackTarget = err
+		for {
+			unpacked, ok := unpackTarget.(*StepRunError)
+			if !ok {
+				if lastUnpacked == nil {
+					break
+				}
+				if waitError, ok := lastUnpacked.Err.(*WaitError); ok {
+					logger.Info("waiting for conditions to be met", "error", err)
+					sleepDuration := 3 * time.Second
+					if waitError.Duration > 0 {
+						sleepDuration = waitError.Duration
+					}
+					return ctrl.Result{RequeueAfter: sleepDuration}, nil
+				}
+				if _, ok := lastUnpacked.Err.(*AbortedByPredicate); ok {
+					logger.Info("aborted by predicate", "error", err)
+					return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+				}
+				break
+			} else {
+				lastUnpacked = unpacked
+				unpackTarget = unpacked.Err
+			}
+		}
+		logger.Error(err, "Error processing reconciliation steps")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+	logger.Info("Reconciliation steps completed successfully")
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil // Never fully abort
 }
