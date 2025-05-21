@@ -28,6 +28,9 @@ type Throttler interface {
 	// Store stores the current time for the given key
 	ShouldRun(key string, s *ThrottlingSettings) bool
 	SetNow(key string)
+	WithPartition(partition string) Throttler
+	// Reset removes the stored time for the given key, allowing it to run immediately
+	Reset(key string)
 }
 
 func NewSyncMapThrottler() *ThrottlingSyncMap {
@@ -72,6 +75,12 @@ func (tsm *ThrottlingSyncMap) SetNow(key string) {
 	key = tsm.partition + ":" + key
 	// SetNow stores the current time for the given key
 	tsm.syncMap.Store(key, time.Now())
+}
+
+func (tsm *ThrottlingSyncMap) Reset(key string) {
+	key = tsm.partition + ":" + key
+	// Reset resets the time for the given key
+	tsm.syncMap.Store(key, time.Time{})
 }
 
 func (tsm *ThrottlingSyncMap) WithPartition(partition string) Throttler {

@@ -6,29 +6,29 @@ import (
 	"time"
 
 	"github.com/weka/go-weka-observability/instrumentation"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// K8sObject is an implementation of ObjectWithConditions for Kubernetes objects
 type K8sObject struct {
-	client     client.Client
-	obj        client.Object
-	conditions *[]metav1.Condition
+	Client     client.Client
+	Object     client.Object
+	Conditions *[]metav1.Condition
 }
 
 func (o *K8sObject) GetName() string {
-	return o.obj.GetName()
+	return o.Object.GetName()
 }
 
 func (o *K8sObject) GetNamespace() string {
-	return o.obj.GetNamespace()
+	return o.Object.GetNamespace()
 }
 
 func (o *K8sObject) IsConditionTrue(conditionType string) bool {
-	return meta.IsStatusConditionTrue(*o.conditions, conditionType)
+	return meta.IsStatusConditionTrue(*o.Conditions, conditionType)
 }
 
 func (o *K8sObject) SetConditionTrue(ctx context.Context, condition Condition) error {
@@ -53,9 +53,9 @@ func (o *K8sObject) setConditions(ctx context.Context, condition metav1.Conditio
 	ctx, _, end := instrumentation.GetLogSpan(ctx, "setConditions", "condition", condition.Type)
 	defer end()
 
-	meta.SetStatusCondition(o.conditions, condition)
-	if err := o.client.Status().Update(ctx, o.obj); err != nil {
-		return &ConditionUpdateError{Err: err, Subject: o.obj, Condition: condition}
+	meta.SetStatusCondition(o.Conditions, condition)
+	if err := o.Client.Status().Update(ctx, o.Object); err != nil {
+		return &ConditionUpdateError{Err: err, Subject: o.Object, Condition: condition}
 	}
 	return nil
 }
@@ -63,12 +63,12 @@ func (o *K8sObject) setConditions(ctx context.Context, condition metav1.Conditio
 func (o *K8sObject) GetSummary() string {
 	kind := ""
 	// cast to metav1.Type
-	t, ok := o.obj.(metav1.Type)
+	t, ok := o.Object.(metav1.Type)
 	if ok {
 		kind = t.GetKind()
 	}
 
-	return fmt.Sprintf("%s:%s", o.obj.GetName(), kind)
+	return fmt.Sprintf("%s:%s", o.Object.GetName(), kind)
 }
 
 func RunAsReconcilerResponse(ctx context.Context, stepsEngine *StepsEngine) (ctrl.Result, error) {
