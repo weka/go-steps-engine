@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel/codes"
 	"github.com/weka/go-weka-observability/instrumentation"
+	"go.opentelemetry.io/otel/codes"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/weka/go-steps-engine/throttling"
@@ -32,6 +32,8 @@ type Step interface {
 	GetPredicates() []PredicateFunc
 	// Should the whole flow be aborted if one of the predicates is false
 	ShouldAbortOnFalsePredicates() bool
+	// Should the whole flow proceed if the step fails
+	ShouldContinueOnError() bool
 	// Get the function that is run if the step fails
 	GetFailureCallback() func(context.Context, string, error) error
 	// Does the step have a condition
@@ -44,6 +46,10 @@ type Step interface {
 	GetThrottlingSettings() *throttling.ThrottlingSettings
 	// Get step name
 	GetName() string
+	// If the step has nested steps, return true
+	HasNestedSteps() bool
+	// Set the object and throttler for the step
+	SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler)
 }
 
 type ObjectWithConditions interface {
@@ -75,13 +81,17 @@ func (r *StepsEngine) Run(ctx context.Context) error {
 		ctx, runLogger, end = instrumentation.GetLogSpan(ctx, "ReconciliationSteps", keysAndValues...)
 		defer end()
 	} else {
-		ctx, runLogger, end = instrumentation.GetLogSpan(ctx, "ReconciliationSteps")
+		ctx, runLogger, end = instrumentation.GetLogSpan(ctx, "")
 		defer end()
 	}
 
 	var stepEnd func()
 STEPS:
 	for _, step := range r.Steps {
+		if step.HasNestedSteps() {
+			step.SetObjectAndThrottler(r.Object, r.Throttler)
+		}
+
 		// setValues does not seem to affect span.
 		// TODO: Fix it! but, first need to move to standalone observability lib and fix there if broken
 		runLogger.SetValues("last_step", step.GetName())
@@ -158,9 +168,16 @@ STEPS:
 			}
 			stepLogger.SetError(err, "Error running step")
 			stepLogger.SetValues("stop_err", err.Error())
-			runLogger.SetError(err, "Error running step "+step.GetName())
-			runLogger.SetValues("stop_err", err.Error())
 			stepEnd()
+
+			if step.ShouldContinueOnError() {
+				// If the step is allowed to continue on error, we go to the next step
+				continue STEPS
+			}
+
+			runLogger.SetValues("stop_err", err.Error())
+			runLogger.SetError(err, "Error running step "+step.GetName())
+
 			return &StepRunError{Err: err, Subject: r.Object, Step: step}
 		}
 
@@ -168,21 +185,23 @@ STEPS:
 		if step.HasCondition() && r.Object != nil {
 			condition := step.GetCondition()
 
-			if condition.Reason == "" {
-				condition.Reason = "Success"
-			}
-			if condition.Message == "" {
-				condition.Message = "Completed successfully"
-			}
+			if !r.Object.IsConditionTrue(condition.Name) {
+				if condition.Reason == "" {
+					condition.Reason = "Success"
+				}
+				if condition.Message == "" {
+					condition.Message = "Completed successfully"
+				}
 
-			err := r.Object.SetConditionTrue(stepCtx, condition)
-			if err != nil {
-				stepEnd()
-				stopErr := &StepRunError{Err: err, Subject: r.Object, Step: step}
-				runLogger.SetValues("stop_err", stopErr.Error())
-				runLogger.SetError(err, "Error running step "+step.GetName())
-				stepLogger.SetError(err, "Error setting condition")
-				return stopErr
+				err := r.Object.SetConditionTrue(stepCtx, condition)
+				if err != nil {
+					stepEnd()
+					stopErr := &StepRunError{Err: err, Subject: r.Object, Step: step}
+					runLogger.SetValues("stop_err", stopErr.Error())
+					runLogger.SetError(err, "Error running step "+step.GetName())
+					stepLogger.SetError(err, "Error setting condition")
+					return stopErr
+				}
 			}
 		}
 

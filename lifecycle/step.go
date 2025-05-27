@@ -30,6 +30,10 @@ type SingleStep struct {
 	// Finish execution successfully if operation ran and completed
 	FinishOnSuccess bool
 
+	// Continue on error
+	// If the step fails, the flow will continue, but the step will be marked as failed
+	ContinueOnError bool
+
 	// The function to execute
 	Run StepFunc
 
@@ -71,6 +75,10 @@ func (s *SingleStep) ShouldAbortOnFalsePredicates() bool {
 	return s.AbortOnPredicatesFalse
 }
 
+func (s *SingleStep) ShouldContinueOnError() bool {
+	return s.ContinueOnError
+}
+
 func (s *SingleStep) GetPredicates() []PredicateFunc {
 	if s.Predicates == nil {
 		return []PredicateFunc{}
@@ -96,4 +104,12 @@ func (s *SingleStep) IsThrottled() bool {
 
 func (s *SingleStep) GetThrottlingSettings() *throttling.ThrottlingSettings {
 	return s.Throttling
+}
+
+func (s *SingleStep) HasNestedSteps() bool {
+	return false
+}
+
+func (s *SingleStep) SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler) {
+	panic("SingleStep does not support SetObjectAndThrottler")
 }
