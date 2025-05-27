@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/weka/go-steps-engine/throttling"
 	"github.com/weka/go-weka-observability/instrumentation"
+
+	"github.com/weka/go-steps-engine/throttling"
 )
 
 type ParallelStepsError struct {
@@ -36,6 +37,9 @@ type ParallelSteps struct {
 	Steps []SimpleStep
 	// The function to execute if the step is failed
 	OnFail func(context.Context, string, error) error
+	// fields to pass to the nested steps engine
+	Object    ObjectWithConditions
+	Throttler throttling.Throttler
 }
 
 func (s *ParallelSteps) GetName() string {
@@ -47,6 +51,11 @@ func (s *ParallelSteps) ShouldAbortOnFalsePredicates() bool {
 }
 
 func (s *ParallelSteps) ShouldFinishOnSuccess() bool {
+	return false
+}
+
+func (s *ParallelSteps) ShouldContinueOnError() bool {
+	// In parallel steps, we do not continue on error, we collect all errors
 	return false
 }
 
@@ -79,6 +88,15 @@ func (s *ParallelSteps) IsThrottled() bool {
 
 func (s *ParallelSteps) GetThrottlingSettings() *throttling.ThrottlingSettings {
 	return nil
+}
+
+func (s *ParallelSteps) HasNestedSteps() bool {
+	return true
+}
+
+func (s *ParallelSteps) SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler) {
+	s.Object = object
+	s.Throttler = throttler
 }
 
 func (s *ParallelSteps) RunStep(ctx context.Context) error {
