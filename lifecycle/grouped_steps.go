@@ -3,6 +3,8 @@ package lifecycle
 import (
 	"context"
 
+	"github.com/weka/go-weka-observability/instrumentation"
+
 	"github.com/weka/go-steps-engine/throttling"
 )
 
@@ -92,10 +94,19 @@ func (s *GroupedSteps) SetObjectAndThrottler(object ObjectWithConditions, thrott
 }
 
 func (s *GroupedSteps) RunStep(ctx context.Context) error {
+	ctx, logger, end := instrumentation.GetLogSpan(ctx, "")
+	defer end()
 	reconSteps := StepsEngine{
 		Steps:     s.Steps,
 		Object:    s.Object,
 		Throttler: s.Throttler,
 	}
-	return reconSteps.Run(ctx)
+	err := reconSteps.Run(ctx)
+	if err != nil && s.OnFail != nil {
+		fErr := s.OnFail(ctx, s.Name, err)
+		if fErr != nil {
+			logger.Error(fErr, "Error running onFail step")
+		}
+	}
+	return err
 }
