@@ -6,30 +6,53 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weka/go-weka-observability/instrumentation"
 	"go.opentelemetry.io/otel/codes"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/weka/go-weka-observability/instrumentation"
 
 	"github.com/weka/go-steps-engine/throttling"
 )
 
 type StepFunc func(ctx context.Context) error
 
-// StepStatus represents the possible states of a step
+// StepStatus represents the possible states of a step during execution.
+// Steps follow a typical lifecycle: pending -> running -> (succeeded|failed)
 type StepStatus string
 
 const (
-	StepStatusPending   StepStatus = "pending"
-	StepStatusRunning   StepStatus = "running"
+	// StepStatusPending indicates the step has not started execution yet.
+	// This is the initial state for all steps.
+	StepStatusPending StepStatus = "pending"
+
+	// StepStatusRunning indicates the step is currently being executed.
+	// Not all StateKeeper implementations support persisting this state.
+	StepStatusRunning StepStatus = "running"
+
+	// StepStatusSucceeded indicates the step completed successfully.
+	// This is a terminal state.
 	StepStatusSucceeded StepStatus = "succeeded"
-	StepStatusFailed    StepStatus = "failed"
+
+	// StepStatusFailed indicates the step failed during execution.
+	// This is a terminal state, though steps can be retried from this state.
+	StepStatusFailed StepStatus = "failed"
 )
 
+// StepState represents the complete state information for a step.
+// It contains both the current status and additional context about why
+// the step is in that state, which is useful for debugging and monitoring.
 type StepState struct {
-	Name    string
-	Status  StepStatus
-	Reason  string
+	// Name is the unique identifier for this step within its execution context
+	Name string
+
+	// Status indicates the current lifecycle state of the step
+	Status StepStatus
+
+	// Reason provides a brief, machine-readable explanation for the current status.
+	// Common values: "Success", "Error", "Timeout", "Cancelled"
+	Reason string
+
+	// Message provides a human-readable description of the current status,
+	// often including error details when Status is StepStatusFailed
 	Message string
 }
 
@@ -62,21 +85,78 @@ type Step interface {
 	ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool
 	// Does the step have a state to track
 	HasState() bool
+	// Get step state name
+	GetStepStateName() string
 	// Get the desired step state in case if step succeeded
 	GetSucceededState() *StepState
 	// Set the stateKeeper and throttler for the step
 	SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler)
 }
 
+// StateKeeper manages the persistent state of steps during execution.
+// It provides an abstraction over different storage backends (K8s conditions, databases, etc.)
+// allowing the same step execution logic to work with different state persistence mechanisms.
+//
+// Implementations should be thread-safe and handle concurrent access to the same step states.
+// State transitions should be atomic to prevent race conditions in multi-threaded environments.
 type StateKeeper interface {
-	// get state attributes that can be useful for logging
-	GetSummaryAttrubutes() map[string]string
-	// get information about the state keeper in one string (for error messages or logs)
+	// GetSummaryAttributes returns key-value pairs that provide contextual information
+	// about this state keeper instance, useful for logging and debugging.
+	// Common attributes include object identifiers, namespaces, or execution contexts.
+	//
+	// Example return values:
+	//   K8s: {"object_name": "my-pod", "namespace": "default", "kind": "Pod"}
+	//   FSDB: {"execution_id": "exec-123", "flow_name": "cluster-ready"}
+	GetSummaryAttributes() map[string]string
+
+	// GetSummary returns a human-readable string representation of this state keeper,
+	// typically used in error messages and logs. Should be concise but descriptive.
+	//
+	// Example return values:
+	//   "Pod:default:my-pod"
+	//   "TestExecution:exec-123:cluster-ready"
 	GetSummary() string
-	// get step state by name
+
+	// GetStepState retrieves the current state of a step by name.
+	// Returns a StepState with Status=StepStatusPending if the step has not been
+	// executed yet or if no state is found.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and timeouts
+	//   stepName: Unique identifier for the step within this execution context
+	//
+	// Returns:
+	//   - StepState with current status, reason, and message
+	//   - Error if state retrieval fails (not if step doesn't exist)
+	//
+	// Thread-safety: Must be safe for concurrent calls
 	GetStepState(ctx context.Context, stepName string) (*StepState, error)
-	// set step state
+
+	// SetStepState persists the state of a step.
+	// The implementation should handle state transitions atomically and may
+	// include additional logic like setting timestamps or validating transitions.
+	//
+	// Parameters:
+	//   ctx: Context for cancellation and timeouts
+	//   state: Complete state information to persist
+	//
+	// Returns:
+	//   - Error if state persistence fails
+	//
+	// Thread-safety: Must be safe for concurrent calls
+	// Idempotency: Setting the same state multiple times should not cause errors
 	SetStepState(ctx context.Context, state *StepState) error
+
+	// SupportsRunningState indicates whether this StateKeeper implementation
+	// can meaningfully track and persist StepStatusRunning state.
+	//
+	// Some backends (like K8s conditions) don't have a natural "running" state
+	// and may skip persisting running transitions to avoid unnecessary updates.
+	//
+	// Returns:
+	//   - true if running states should be persisted
+	//   - false if running state transitions should be skipped
+	SupportsRunningState() bool
 }
 
 type StepsEngine struct {
@@ -90,7 +170,7 @@ func (r *StepsEngine) Run(ctx context.Context) error {
 	var runLogger *instrumentation.SpanLogger
 	if r.StateKeeper != nil {
 		var keysAndValues []any
-		for k, v := range r.StateKeeper.GetSummaryAttrubutes() {
+		for k, v := range r.StateKeeper.GetSummaryAttributes() {
 			keysAndValues = append(keysAndValues, k, v)
 		}
 
@@ -152,10 +232,10 @@ STEPS:
 		stepEnd = spanEnd
 		defer spanEnd() // in case we dont handle it will in terms of closing in for loop
 
-		// mark the step as running (if it has state)
-		if step.HasState() && r.StateKeeper != nil {
+		// Mark the step as running (if it has state and the StateKeeper supports running states)
+		if step.HasState() && r.StateKeeper != nil && r.StateKeeper.SupportsRunningState() {
 			state := StepState{
-				Name:   step.GetName(),
+				Name:   step.GetStepStateName(),
 				Status: StepStatusRunning,
 			}
 			err := r.StateKeeper.SetStepState(stepCtx, &state)
@@ -164,7 +244,7 @@ STEPS:
 				stepLogger.SetValues("stop_err", err.Error())
 				stepEnd()
 
-				return fmt.Errorf("error setting step %s state to running: %w", step.GetName(), err)
+				return fmt.Errorf("error setting step %s state to running: %w", step.GetStepStateName(), err)
 			}
 		}
 
@@ -181,7 +261,7 @@ STEPS:
 
 			if step.HasState() && r.StateKeeper != nil {
 				state := StepState{
-					Name:    step.GetName(),
+					Name:    step.GetStepStateName(),
 					Reason:  "Error",
 					Message: err.Error(),
 					Status:  StepStatusFailed,

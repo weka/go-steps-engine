@@ -27,7 +27,7 @@ type GroupedSteps struct {
 
 	// fields to pass to the nested steps engine
 	StateKeeper StateKeeper
-	Throttler    throttling.Throttler
+	Throttler   throttling.Throttler
 }
 
 func (s *GroupedSteps) GetName() string {
@@ -57,8 +57,12 @@ func (s *GroupedSteps) HasState() bool {
 	return false
 }
 
+func (s *GroupedSteps) GetStepStateName() string {
+	panic("not supported for GroupedSteps")
+}
+
 func (s *GroupedSteps) GetSucceededState() *StepState {
-	return nil
+	panic("not supported for GroupedSteps")
 }
 
 func (s *GroupedSteps) ShouldSkip(ctx context.Context, object StateKeeper) bool {

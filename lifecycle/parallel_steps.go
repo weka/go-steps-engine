@@ -39,7 +39,7 @@ type ParallelSteps struct {
 	OnFail func(context.Context, string, error) error
 	// fields to pass to the nested steps engine
 	StateKeeper StateKeeper
-	Throttler    throttling.Throttler
+	Throttler   throttling.Throttler
 }
 
 func (s *ParallelSteps) GetName() string {
@@ -70,8 +70,12 @@ func (s *ParallelSteps) HasState() bool {
 	return false
 }
 
+func (s *ParallelSteps) GetStepStateName() string {
+	panic("not supported for ParallelSteps")
+}
+
 func (s *ParallelSteps) GetSucceededState() *StepState {
-	return nil
+	panic("not supported for ParallelSteps")
 }
 
 func (s *ParallelSteps) ShouldSkip(ctx context.Context, object StateKeeper) bool {

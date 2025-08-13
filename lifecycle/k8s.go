@@ -13,14 +13,27 @@ import (
 	"github.com/weka/go-weka-observability/instrumentation"
 )
 
-// K8sObject is an implementation of ObjectWithConditions for Kubernetes objects
+// K8sObject implements StateKeeper for Kubernetes objects using metav1.Condition.
+// It maps step states to Kubernetes condition states:
+//   - StepStatusSucceeded -> ConditionTrue
+//   - StepStatusFailed -> ConditionFalse
+//   - StepStatusPending -> ConditionUnknown (or condition not present)
+//   - StepStatusRunning -> Skipped (K8s conditions don't have a natural running state)
+//
+// The K8sObject automatically updates the Kubernetes object's status conditions
+// when SetStepState is called, providing persistent state tracking that survives
+// pod restarts and controller reconciliation cycles.
 type K8sObject struct {
-	Client     client.Client
-	Object     client.Object
+	// Client is the Kubernetes client used to update object status
+	Client client.Client
+	// Object is the Kubernetes object whose conditions will be managed
+	Object client.Object
+	// Conditions points to the slice of conditions in the object's status
 	Conditions *[]metav1.Condition
 }
 
-func (o *K8sObject) GetSummaryAttrubutes() map[string]string {
+// GetSummaryAttributes returns metadata about this Kubernetes object for logging
+func (o *K8sObject) GetSummaryAttributes() map[string]string {
 	return map[string]string{
 		"object_name":      o.Object.GetName(),
 		"object_namespace": o.Object.GetNamespace(),
@@ -28,6 +41,8 @@ func (o *K8sObject) GetSummaryAttrubutes() map[string]string {
 	}
 }
 
+// GetStepState retrieves the current state of a step by mapping from Kubernetes conditions.
+// If no condition exists for the given step name, returns a pending state.
 func (o *K8sObject) GetStepState(ctx context.Context, conditionType string) (*StepState, error) {
 	pendingState := StepState{
 		Name:   conditionType,
@@ -48,19 +63,22 @@ func (o *K8sObject) GetStepState(ctx context.Context, conditionType string) (*St
 	return &stepState, nil
 }
 
-func (o *K8sObject) SetStepStateRunning(ctx context.Context, stateUpdate StepState) error {
-	// For K8s objects, we skip setting running state as metav1.Condition doesn't have a running status
-	return nil
-}
-
-func (o *K8sObject) SetStepState(ctx context.Context, state StepState) error {
-	condition := stepStateToK8sCondition(state)
-	// skip setting condition "unknown"
-	if condition.Status == metav1.ConditionUnknown {
+// SetStepState persists a step state by updating the corresponding Kubernetes condition.
+// Running states are skipped since K8s conditions don't have a natural running state.
+func (o *K8sObject) SetStepState(ctx context.Context, state *StepState) error {
+	condition := stepStateToK8sCondition(*state)
+	// Skip setting condition "unknown" and running states
+	if condition.Status == metav1.ConditionUnknown || state.Status == StepStatusRunning {
 		return nil
 	}
 
 	return o.setConditions(ctx, condition)
+}
+
+// SupportsRunningState returns false because Kubernetes conditions don't have a natural
+// "running" state - they are typically either True, False, or Unknown.
+func (o *K8sObject) SupportsRunningState() bool {
+	return false
 }
 
 func (o *K8sObject) setConditions(ctx context.Context, condition metav1.Condition) error {
