@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weka/go-weka-observability/instrumentation"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/weka/go-weka-observability/instrumentation"
 )
 
 // K8sObject is an implementation of ObjectWithConditions for Kubernetes objects
@@ -19,34 +20,47 @@ type K8sObject struct {
 	Conditions *[]metav1.Condition
 }
 
-func (o *K8sObject) GetName() string {
-	return o.Object.GetName()
+func (o *K8sObject) GetSummaryAttrubutes() map[string]string {
+	return map[string]string{
+		"object_name":      o.Object.GetName(),
+		"object_namespace": o.Object.GetNamespace(),
+		"kind":             o.Object.GetObjectKind().GroupVersionKind().Kind,
+	}
 }
 
-func (o *K8sObject) GetNamespace() string {
-	return o.Object.GetNamespace()
+func (o *K8sObject) GetStepState(ctx context.Context, conditionType string) (*StepState, error) {
+	pendingState := StepState{
+		Name:   conditionType,
+		Status: StepStatusPending,
+	}
+	if o.Conditions == nil {
+		// If conditions are not set, return pending state
+		return &pendingState, nil
+	}
+
+	condition := meta.FindStatusCondition(*o.Conditions, conditionType)
+	if condition == nil {
+		// If condition is not found, return pending state
+		return &pendingState, nil
+	}
+
+	stepState := k8sConditionToStepState(*condition)
+	return &stepState, nil
 }
 
-func (o *K8sObject) IsConditionTrue(conditionType string) bool {
-	return meta.IsStatusConditionTrue(*o.Conditions, conditionType)
+func (o *K8sObject) SetStepStateRunning(ctx context.Context, stateUpdate StepState) error {
+	// For K8s objects, we skip setting running state as metav1.Condition doesn't have a running status
+	return nil
 }
 
-func (o *K8sObject) SetConditionTrue(ctx context.Context, condition Condition) error {
-	return o.setConditions(ctx, metav1.Condition{
-		Type:    condition.Name,
-		Status:  metav1.ConditionTrue,
-		Reason:  condition.Reason,
-		Message: condition.Message,
-	})
-}
+func (o *K8sObject) SetStepState(ctx context.Context, state StepState) error {
+	condition := stepStateToK8sCondition(state)
+	// skip setting condition "unknown"
+	if condition.Status == metav1.ConditionUnknown {
+		return nil
+	}
 
-func (o *K8sObject) SetConditionFalse(ctx context.Context, condition Condition) error {
-	return o.setConditions(ctx, metav1.Condition{
-		Type:    condition.Name,
-		Status:  metav1.ConditionFalse,
-		Reason:  condition.Reason,
-		Message: condition.Message,
-	})
+	return o.setConditions(ctx, condition)
 }
 
 func (o *K8sObject) setConditions(ctx context.Context, condition metav1.Condition) error {
@@ -61,14 +75,48 @@ func (o *K8sObject) setConditions(ctx context.Context, condition metav1.Conditio
 }
 
 func (o *K8sObject) GetSummary() string {
-	kind := ""
-	// cast to metav1.Type
-	t, ok := o.Object.(metav1.Type)
-	if ok {
-		kind = t.GetKind()
+	kind := o.Object.GetObjectKind().GroupVersionKind().Kind
+	name := o.Object.GetName()
+	namespace := o.Object.GetNamespace()
+
+	return fmt.Sprintf("%s:%s:%s", kind, namespace, name)
+}
+
+func k8sConditionToStepState(condition metav1.Condition) StepState {
+	s := StepState{
+		Name:    condition.Type,
+		Reason:  condition.Reason,
+		Message: condition.Message,
+		Status:  StepStatusPending,
 	}
 
-	return fmt.Sprintf("%s:%s", o.Object.GetName(), kind)
+	if condition.Status == metav1.ConditionTrue {
+		s.Status = StepStatusSucceeded
+	} else if s.Reason == "Error" {
+		s.Status = StepStatusFailed
+	} else if s.Reason == "InProgress" {
+		s.Status = StepStatusRunning
+	}
+
+	return s
+}
+
+func stepStateToK8sCondition(state StepState) metav1.Condition {
+	condition := metav1.Condition{
+		Type:    state.Name,
+		Reason:  state.Reason,
+		Message: state.Message,
+	}
+
+	if state.Status == StepStatusSucceeded {
+		condition.Status = metav1.ConditionTrue
+	} else if state.Status == StepStatusFailed {
+		condition.Status = metav1.ConditionFalse
+	} else {
+		condition.Status = metav1.ConditionUnknown
+	}
+
+	return condition
 }
 
 func RunAsReconcilerResponse(ctx context.Context, stepsEngine *StepsEngine) (ctrl.Result, error) {

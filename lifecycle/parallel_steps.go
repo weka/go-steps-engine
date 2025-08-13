@@ -38,8 +38,8 @@ type ParallelSteps struct {
 	// The function to execute if the step is failed
 	OnFail func(context.Context, string, error) error
 	// fields to pass to the nested steps engine
-	Object    ObjectWithConditions
-	Throttler throttling.Throttler
+	StateKeeper StateKeeper
+	Throttler    throttling.Throttler
 }
 
 func (s *ParallelSteps) GetName() string {
@@ -66,15 +66,15 @@ func (s *ParallelSteps) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
-func (s *ParallelSteps) HasCondition() bool {
+func (s *ParallelSteps) HasState() bool {
 	return false
 }
 
-func (s *ParallelSteps) GetCondition() Condition {
-	panic("ParallelSteps do not have conditions")
+func (s *ParallelSteps) GetSucceededState() *StepState {
+	return nil
 }
 
-func (s *ParallelSteps) ShouldSkip(_ ObjectWithConditions) bool {
+func (s *ParallelSteps) ShouldSkip(ctx context.Context, object StateKeeper) bool {
 	return false
 }
 
@@ -94,8 +94,8 @@ func (s *ParallelSteps) HasNestedSteps() bool {
 	return true
 }
 
-func (s *ParallelSteps) SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler) {
-	s.Object = object
+func (s *ParallelSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
+	s.StateKeeper = stateKeeper
 	s.Throttler = throttler
 }
 

@@ -30,7 +30,7 @@ func NewWaitErrorWithDuration(err error, duration time.Duration) error {
 
 type StepRunError struct {
 	Err     error
-	Subject ObjectWithConditions
+	Subject StateKeeper
 	Step    Step
 }
 

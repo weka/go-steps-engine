@@ -12,14 +12,14 @@ type SingleStep struct {
 	// NOTE: put explicit name for throttled funcs to ensure it's static and not affected by magic names change
 	Name string
 
-	// Condition that must be false for the step to be executed, set to True if the step is done succesfully
-	Condition   string
-	CondReason  string
-	CondMessage string
+	// Step state should not be "succeeded" for the step to be executed
+	StepStateName    string
+	StepStateReason  string
+	StepStateMessage string
 
-	// Should the step be run if the condition is already true
+	// Should the step be run if the state is already succeeded
 	// Preconditions will also be evaluated and must be true
-	SkipOwnConditionCheck bool
+	SkipStepStateCheck bool
 
 	// Predicates must all be true for the step to be executed
 	Predicates []PredicateFunc
@@ -59,15 +59,16 @@ func (s *SingleStep) GetName() string {
 	return s.Name
 }
 
-func (s *SingleStep) HasCondition() bool {
-	return s.Condition != ""
+func (s *SingleStep) HasState() bool {
+	return s.StepStateName != ""
 }
 
-func (s *SingleStep) GetCondition() Condition {
-	return Condition{
-		Name:    s.Condition,
-		Reason:  s.CondReason,
-		Message: s.CondMessage,
+func (s *SingleStep) GetSucceededState() *StepState {
+	return &StepState{
+		Name:    s.StepStateName,
+		Reason:  s.StepStateReason,
+		Message: s.StepStateMessage,
+		Status:  StepStatusSucceeded,
 	}
 }
 
@@ -86,10 +87,11 @@ func (s *SingleStep) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
-func (s *SingleStep) ShouldSkip(object ObjectWithConditions) bool {
-	// Check if step is already done or if the condition should be able to run again
-	if object != nil && s.Condition != "" && !s.SkipOwnConditionCheck {
-		return object.IsConditionTrue(s.Condition)
+func (s *SingleStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
+	// Check if step is already done or if it should be able to run again
+	if stateKeeper != nil && s.StepStateName != "" && !s.SkipStepStateCheck {
+		s, _ := stateKeeper.GetStepState(ctx, s.StepStateName)
+		return s != nil && s.StatusEqual(StepStatusSucceeded)
 	}
 	return false
 }
@@ -110,6 +112,6 @@ func (s *SingleStep) HasNestedSteps() bool {
 	return false
 }
 
-func (s *SingleStep) SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler) {
-	panic("SingleStep does not support SetObjectAndThrottler")
+func (s *SingleStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
+	panic("SingleStep does not support SetStateKeeperAndThrottler")
 }

@@ -26,8 +26,8 @@ type GroupedSteps struct {
 	Throttling *throttling.ThrottlingSettings
 
 	// fields to pass to the nested steps engine
-	Object    ObjectWithConditions
-	Throttler throttling.Throttler
+	StateKeeper StateKeeper
+	Throttler    throttling.Throttler
 }
 
 func (s *GroupedSteps) GetName() string {
@@ -53,15 +53,15 @@ func (s *GroupedSteps) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
-func (s *GroupedSteps) HasCondition() bool {
+func (s *GroupedSteps) HasState() bool {
 	return false
 }
 
-func (s *GroupedSteps) GetCondition() Condition {
-	panic("GroupedSteps do not have conditions")
+func (s *GroupedSteps) GetSucceededState() *StepState {
+	return nil
 }
 
-func (s *GroupedSteps) ShouldSkip(_ ObjectWithConditions) bool {
+func (s *GroupedSteps) ShouldSkip(ctx context.Context, object StateKeeper) bool {
 	return false
 }
 
@@ -81,21 +81,21 @@ func (s *GroupedSteps) HasNestedSteps() bool {
 	return true
 }
 
-func (s *GroupedSteps) SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler) {
-	s.Object = object
+func (s *GroupedSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
+	s.StateKeeper = stateKeeper
 	s.Throttler = throttler
 	for _, step := range s.Steps {
 		if step.HasNestedSteps() {
-			step.SetObjectAndThrottler(object, throttler)
+			step.SetStateKeeperAndThrottler(stateKeeper, throttler)
 		}
 	}
 }
 
 func (s *GroupedSteps) RunStep(ctx context.Context) error {
 	reconSteps := StepsEngine{
-		Steps:     s.Steps,
-		Object:    s.Object,
-		Throttler: s.Throttler,
+		Steps:       s.Steps,
+		StateKeeper: s.StateKeeper,
+		Throttler:   s.Throttler,
 	}
 	return reconSteps.Run(ctx)
 }
