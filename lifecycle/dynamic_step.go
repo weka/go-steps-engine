@@ -29,7 +29,7 @@ type DynamicStep struct {
 
 	// fields to pass to the nested steps engine
 	StateKeeper StateKeeper
-	Throttler    throttling.Throttler
+	Throttler   throttling.Throttler
 }
 
 func (s *DynamicStep) getStep() Step {
@@ -68,7 +68,11 @@ func (s *DynamicStep) HasState() bool {
 }
 
 func (s *DynamicStep) GetSucceededState() *StepState {
-	return nil
+	panic("not supported for DynamicStep")
+}
+
+func (s *DynamicStep) GetStepStateName() string {
+	panic("not supported for DynamicStep")
 }
 
 func (s *DynamicStep) ShouldSkip(ctx context.Context, object StateKeeper) bool {

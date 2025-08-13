@@ -16,7 +16,7 @@ import (
 	"github.com/weka/go-weka-observability/instrumentation"
 )
 
-func setupLogging(ctx context.Context) (logger logr.Logger, shutdown func(context.Context) error) {
+func SetupLogging(ctx context.Context) (logger logr.Logger, shutdown func(context.Context) error) {
 	writer := zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.TimeOnly}
 	zeroLogger := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 	logger = zerologr.New(&zeroLogger)
@@ -57,7 +57,7 @@ func (m *MockFail) Run(_ context.Context) error {
 func TestStepEngineSuccess(t *testing.T) {
 	ctx := context.Background()
 
-	_, shutdown := setupLogging(ctx)
+	_, shutdown := SetupLogging(ctx)
 	defer shutdown(ctx)
 
 	mockSuccess := &MockSuccess{}
@@ -97,7 +97,7 @@ func TestStepEngineSuccess(t *testing.T) {
 func TestStepEngineFailOnFirstStep(t *testing.T) {
 	ctx := context.Background()
 
-	_, shutdown := setupLogging(ctx)
+	_, shutdown := SetupLogging(ctx)
 	defer shutdown(ctx)
 
 	mockFail := &MockFail{}

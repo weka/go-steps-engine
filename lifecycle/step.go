@@ -7,15 +7,29 @@ import (
 	"github.com/weka/go-steps-engine/util"
 )
 
+// StepStateOverrides allows customizing step state attributes.
+// When EnableState is true and overrides are not provided, sensible defaults are used.
+type StepStateOverrides struct {
+	// Name of the state condition. If empty, defaults to step name.
+	Name string
+	// Reason for the state when step succeeds. If empty, uses default.
+	Reason string
+	// Message for the state when step succeeds. If empty, uses default.
+	Message string
+}
+
 type SingleStep struct {
 	// Name of the step
 	// NOTE: put explicit name for throttled funcs to ensure it's static and not affected by magic names change
 	Name string
 
-	// Step state should not be "succeeded" for the step to be executed
-	StepStateName    string
-	StepStateReason  string
-	StepStateMessage string
+	// EnableState controls whether step state should be tracked.
+	// When true, the step's execution state will be persisted via StateKeeper.
+	EnableState bool
+
+	// StateOverrides allows customizing state attributes when EnableState is true.
+	// If not provided or fields are empty, sensible defaults are used.
+	StateOverrides StepStateOverrides
 
 	// Should the step be run if the state is already succeeded
 	// Preconditions will also be evaluated and must be true
@@ -60,14 +74,39 @@ func (s *SingleStep) GetName() string {
 }
 
 func (s *SingleStep) HasState() bool {
-	return s.StepStateName != ""
+	return s.EnableState
+}
+
+func (s *SingleStep) GetStepStateName() string {
+	if !s.EnableState {
+		return ""
+	}
+	if s.StateOverrides.Name != "" {
+		return s.StateOverrides.Name
+	}
+	// Fallback to step name if no override provided
+	return s.GetName()
 }
 
 func (s *SingleStep) GetSucceededState() *StepState {
+	if !s.EnableState {
+		return nil
+	}
+
+	reason := ""
+	if s.StateOverrides.Reason != "" {
+		reason = s.StateOverrides.Reason
+	}
+
+	message := ""
+	if s.StateOverrides.Message != "" {
+		message = s.StateOverrides.Message
+	}
+
 	return &StepState{
-		Name:    s.StepStateName,
-		Reason:  s.StepStateReason,
-		Message: s.StepStateMessage,
+		Name:    s.GetStepStateName(),
+		Reason:  reason,
+		Message: message,
 		Status:  StepStatusSucceeded,
 	}
 }
@@ -89,9 +128,9 @@ func (s *SingleStep) GetPredicates() []PredicateFunc {
 
 func (s *SingleStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
 	// Check if step is already done or if it should be able to run again
-	if stateKeeper != nil && s.StepStateName != "" && !s.SkipStepStateCheck {
-		s, _ := stateKeeper.GetStepState(ctx, s.StepStateName)
-		return s != nil && s.StatusEqual(StepStatusSucceeded)
+	if stateKeeper != nil && s.HasState() && !s.SkipStepStateCheck {
+		state, _ := stateKeeper.GetStepState(ctx, s.GetStepStateName())
+		return state != nil && state.StatusEqual(StepStatusSucceeded)
 	}
 	return false
 }
