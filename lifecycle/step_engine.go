@@ -6,24 +6,38 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weka/go-weka-observability/instrumentation"
 	"go.opentelemetry.io/otel/codes"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/weka/go-weka-observability/instrumentation"
 
 	"github.com/weka/go-steps-engine/throttling"
 )
 
 type StepFunc func(ctx context.Context) error
 
-type Condition struct {
+// StepStatus represents the possible states of a step
+type StepStatus string
+
+const (
+	StepStatusPending   StepStatus = "pending"
+	StepStatusRunning   StepStatus = "running"
+	StepStatusSucceeded StepStatus = "succeeded"
+	StepStatusFailed    StepStatus = "failed"
+)
+
+type StepState struct {
 	Name    string
+	Status  StepStatus
 	Reason  string
 	Message string
 }
 
+func (s *StepState) StatusEqual(other StepStatus) bool {
+	return s.Status == other
+}
+
 type Step interface {
-	// Should the step be skipped if the condition is already true
-	ShouldSkip(object ObjectWithConditions) bool
 	// Run the underlying function of the step
 	RunStep(ctx context.Context) error
 	// Should the step become the last one in the flow if it succeeds
@@ -36,10 +50,6 @@ type Step interface {
 	ShouldContinueOnError() bool
 	// Get the function that is run if the step fails
 	GetFailureCallback() func(context.Context, string, error) error
-	// Does the step have a condition
-	HasCondition() bool
-	// Get the condition
-	GetCondition() Condition
 	// Is step throttled
 	IsThrottled() bool
 	// Get throttling settings
@@ -48,34 +58,40 @@ type Step interface {
 	GetName() string
 	// If the step has nested steps, return true
 	HasNestedSteps() bool
-	// Set the object and throttler for the step
-	SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler)
+	// Should the step be skipped if the state is already true
+	ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool
+	// Does the step have a state to track
+	HasState() bool
+	// Get the desired step state in case if step succeeded
+	GetSucceededState() *StepState
+	// Set the stateKeeper and throttler for the step
+	SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler)
 }
 
-type ObjectWithConditions interface {
-	GetName() string
-	// returns the namespace of the object (if it has one)
-	GetNamespace() string
-	// get information about object in one string (for error messages or logs)
+type StateKeeper interface {
+	// get state attributes that can be useful for logging
+	GetSummaryAttrubutes() map[string]string
+	// get information about the state keeper in one string (for error messages or logs)
 	GetSummary() string
-	IsConditionTrue(conditionName string) bool
-	SetConditionTrue(ctx context.Context, condition Condition) error
-	SetConditionFalse(ctx context.Context, condition Condition) error
+	// get step state by name
+	GetStepState(ctx context.Context, stepName string) (*StepState, error)
+	// set step state
+	SetStepState(ctx context.Context, state *StepState) error
 }
 
 type StepsEngine struct {
-	Object    ObjectWithConditions
-	Throttler throttling.Throttler
-	Steps     []Step
+	StateKeeper StateKeeper
+	Throttler   throttling.Throttler
+	Steps       []Step
 }
 
 func (r *StepsEngine) Run(ctx context.Context) error {
 	var end func()
 	var runLogger *instrumentation.SpanLogger
-	if r.Object != nil {
-		keysAndValues := []any{"object_name", r.Object.GetName()}
-		if r.Object.GetNamespace() != "" {
-			keysAndValues = append(keysAndValues, "object_namespace", r.Object.GetNamespace())
+	if r.StateKeeper != nil {
+		var keysAndValues []any
+		for k, v := range r.StateKeeper.GetSummaryAttrubutes() {
+			keysAndValues = append(keysAndValues, k, v)
 		}
 
 		ctx, runLogger, end = instrumentation.GetLogSpan(ctx, "ReconciliationSteps", keysAndValues...)
@@ -89,7 +105,7 @@ func (r *StepsEngine) Run(ctx context.Context) error {
 STEPS:
 	for _, step := range r.Steps {
 		if step.HasNestedSteps() {
-			step.SetObjectAndThrottler(r.Object, r.Throttler)
+			step.SetStateKeeperAndThrottler(r.StateKeeper, r.Throttler)
 		}
 
 		// setValues does not seem to affect span.
@@ -100,7 +116,7 @@ STEPS:
 			stepEnd = nil
 		}
 
-		if step.ShouldSkip(r.Object) {
+		if step.ShouldSkip(ctx, r.StateKeeper) {
 			continue STEPS
 		}
 
@@ -136,6 +152,22 @@ STEPS:
 		stepEnd = spanEnd
 		defer spanEnd() // in case we dont handle it will in terms of closing in for loop
 
+		// mark the step as running (if it has state)
+		if step.HasState() && r.StateKeeper != nil {
+			state := StepState{
+				Name:   step.GetName(),
+				Status: StepStatusRunning,
+			}
+			err := r.StateKeeper.SetStepState(stepCtx, &state)
+			if err != nil {
+				stepLogger.SetError(err, "Error setting step state to running")
+				stepLogger.SetValues("stop_err", err.Error())
+				stepEnd()
+
+				return fmt.Errorf("error setting step %s state to running: %w", step.GetName(), err)
+			}
+		}
+
 		if err := step.RunStep(stepCtx); err != nil {
 			// if the error is not expected error, we should stop the reconciliation,
 			// otherwise - continue to the next step
@@ -147,17 +179,20 @@ STEPS:
 				continue STEPS
 			}
 
-			if step.HasCondition() && r.Object != nil {
-				condition := step.GetCondition()
-				condition.Reason = "Error"
-				condition.Message = err.Error()
+			if step.HasState() && r.StateKeeper != nil {
+				state := StepState{
+					Name:    step.GetName(),
+					Reason:  "Error",
+					Message: err.Error(),
+					Status:  StepStatusFailed,
+				}
 
-				setCondError := r.Object.SetConditionFalse(stepCtx, condition)
-				if setCondError != nil {
-					stepLogger.Debug("error setting reconcile error on object", "step", step.GetName(), "error", setCondError)
+				setStateError := r.StateKeeper.SetStepState(stepCtx, &state)
+				if setStateError != nil {
+					stepLogger.Debug("error setting step failure state on object", "step", step.GetName(), "error", setStateError)
 					stepLogger.SetError(err, "Error running step")
 					stepEnd()
-					return setCondError
+					return setStateError
 				}
 			}
 			if step.GetFailureCallback() != nil {
@@ -178,28 +213,30 @@ STEPS:
 			runLogger.SetValues("stop_err", err.Error())
 			runLogger.SetError(err, "Error running step "+step.GetName())
 
-			return &StepRunError{Err: err, Subject: r.Object, Step: step}
+			return &StepRunError{Err: err, Subject: r.StateKeeper, Step: step}
 		}
 
-		// Update condition in case of success
-		if step.HasCondition() && r.Object != nil {
-			condition := step.GetCondition()
+		// Update state in case of success
+		if step.HasState() && r.StateKeeper != nil {
+			state, _ := r.StateKeeper.GetStepState(stepCtx, step.GetName())
 
-			if !r.Object.IsConditionTrue(condition.Name) {
-				if condition.Reason == "" {
-					condition.Reason = "Success"
+			if state == nil || !state.StatusEqual(StepStatusSucceeded) {
+				state = step.GetSucceededState()
+
+				if state.Reason == "" {
+					state.Reason = "Success"
 				}
-				if condition.Message == "" {
-					condition.Message = "Completed successfully"
+				if state.Message == "" {
+					state.Message = "Completed successfully"
 				}
 
-				err := r.Object.SetConditionTrue(stepCtx, condition)
+				err := r.StateKeeper.SetStepState(stepCtx, state)
 				if err != nil {
 					stepEnd()
-					stopErr := &StepRunError{Err: err, Subject: r.Object, Step: step}
+					stopErr := &StepRunError{Err: err, Subject: r.StateKeeper, Step: step}
 					runLogger.SetValues("stop_err", stopErr.Error())
 					runLogger.SetError(err, "Error running step "+step.GetName())
-					stepLogger.SetError(err, "Error setting condition")
+					stepLogger.SetError(err, "Error setting state")
 					return stopErr
 				}
 			}

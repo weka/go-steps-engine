@@ -28,8 +28,8 @@ type DynamicStep struct {
 	Throttling *throttling.ThrottlingSettings
 
 	// fields to pass to the nested steps engine
-	Object    ObjectWithConditions
-	Throttler throttling.Throttler
+	StateKeeper StateKeeper
+	Throttler    throttling.Throttler
 }
 
 func (s *DynamicStep) getStep() Step {
@@ -63,15 +63,15 @@ func (s *DynamicStep) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
-func (s *DynamicStep) HasCondition() bool {
+func (s *DynamicStep) HasState() bool {
 	return false
 }
 
-func (s *DynamicStep) GetCondition() Condition {
-	panic("DynamicStep does not have conditions")
+func (s *DynamicStep) GetSucceededState() *StepState {
+	return nil
 }
 
-func (s *DynamicStep) ShouldSkip(_ ObjectWithConditions) bool {
+func (s *DynamicStep) ShouldSkip(ctx context.Context, object StateKeeper) bool {
 	return false
 }
 
@@ -91,21 +91,21 @@ func (s *DynamicStep) HasNestedSteps() bool {
 	return true
 }
 
-func (s *DynamicStep) SetObjectAndThrottler(object ObjectWithConditions, throttler throttling.Throttler) {
-	s.Object = object
+func (s *DynamicStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
+	s.StateKeeper = stateKeeper
 	s.Throttler = throttler
 
 	step := s.getStep()
 	if step.HasNestedSteps() {
-		step.SetObjectAndThrottler(object, throttler)
+		step.SetStateKeeperAndThrottler(stateKeeper, throttler)
 	}
 }
 
 func (s *DynamicStep) RunStep(ctx context.Context) error {
 	reconSteps := StepsEngine{
-		Steps:     []Step{s.getStep()},
-		Object:    s.Object,
-		Throttler: s.Throttler,
+		Steps:       []Step{s.getStep()},
+		StateKeeper: s.StateKeeper,
+		Throttler:   s.Throttler,
 	}
 	return reconSteps.Run(ctx)
 }
