@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/create-github-app-token@v2
+      id: app-token
+      with:
+        app-id: ${{ vars.SCALAR_WORKERS_APP_ID }}
+        private-key: ${{ secrets.SCALAR_WORKERS_APP_PRIVATE_KEY }}
+        owner: ${{ github.repository_owner }}
+
+    - name: Setup access for private go modules
+      run: |
+        git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf https://github.com/
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        token: ${{ steps.app-token.outputs.token }}
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Tidy dependencies
+      run: go mod tidy
+    
+    - name: Format check
+      run: |
+        go fmt ./...
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "Code is not properly formatted. Run 'go fmt ./...' to fix:"
+          git diff
+          exit 1
+        fi
+    
+    - name: Vet
+      run: go vet ./...
+    
+    - name: Build
+      run: go build ./...
+    
+    - name: Run tests
+      run: go test -v ./...
