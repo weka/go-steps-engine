@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/zerologr v1.2.3
 	github.com/rs/zerolog v1.33.0
 	github.com/stretchr/testify v1.10.0
-	github.com/weka/go-weka-observability v0.0.0-20240930095930-bd198747926c
+	github.com/weka/go-weka-observability v0.0.0-20250812120309-d53d17a084ad
 	go.opentelemetry.io/otel v1.34.0
 	k8s.io/apimachinery v0.32.2
 	k8s.io/client-go v0.32.1
