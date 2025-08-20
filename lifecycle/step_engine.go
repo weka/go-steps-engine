@@ -341,18 +341,6 @@ STEPS:
 	return nil
 }
 
-func ForceNoError(f StepFunc) StepFunc {
-	return func(ctx context.Context) error {
-		_, logger, end := instrumentation.GetLogSpan(ctx, "ForceNoError")
-		defer end()
-		ret := f(ctx)
-		if ret != nil {
-			logger.SetError(ret, "transient error in step, but forcing no error in flow")
-		}
-		return nil
-	}
-}
-
 func (r *StepsEngine) RunAsReconcilerResponse(ctx context.Context) (ctrl.Result, error) {
 	ctx, logger, end := instrumentation.GetLogSpan(ctx, "")
 	defer end()
