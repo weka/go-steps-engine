@@ -77,9 +77,8 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Define reconciliation steps
 	steps := []lifecycle.Step{
 		&lifecycle.SingleStep{
-			Name:        "validate-spec",
-			EnableState: true,
-			StateOverrides: lifecycle.StepStateOverrides{
+			Name: "validate-spec",
+			State: &lifecycle.State{
 				Name:    "SpecValid",
 				Reason:  "ValidationComplete",
 				Message: "Spec validation completed successfully",
@@ -100,9 +99,8 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			},
 		},
 		&lifecycle.SingleStep{
-			Name:        "create-deployment",
-			EnableState: true,
-			StateOverrides: lifecycle.StepStateOverrides{
+			Name: "create-deployment",
+			State: &lifecycle.State{
 				Name:    "DeploymentReady",
 				Reason:  "DeploymentCreated",
 				Message: "Deployment created and ready",
@@ -124,9 +122,8 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			},
 		},
 		&lifecycle.SingleStep{
-			Name:        "create-service",
-			EnableState: true,
-			StateOverrides: lifecycle.StepStateOverrides{
+			Name: "create-service",
+			State: &lifecycle.State{
 				Name:    "ServiceReady",
 				Reason:  "ServiceCreated",
 				Message: "Service created and ready",
@@ -143,9 +140,8 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			},
 		},
 		&lifecycle.SingleStep{
-			Name:        "finalize-status",
-			EnableState: true,
-			StateOverrides: lifecycle.StepStateOverrides{
+			Name: "finalize-status",
+			State: &lifecycle.State{
 				Name:    "Ready",
 				Reason:  "AllComponentsReady",
 				Message: "All components are ready and healthy",
