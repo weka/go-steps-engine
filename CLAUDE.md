@@ -55,7 +55,7 @@ The go-steps-engine is a state-aware step execution framework with these key com
 - Steps map to Kubernetes conditions on custom resources
 - State mapping: `StepStatusSucceeded` → `ConditionTrue`, `StepStatusFailed` → `ConditionFalse`
 - Running state is skipped (K8s conditions don't support it)
-- Condition names use `StateOverrides.Name` field from steps (or step name if not overridden)
+- Condition names use `State.Name` field from steps (required when State is set, fallback to step name for backward compatibility)
 
 **Database Integration** 
 - Full lifecycle support including running states
@@ -71,8 +71,10 @@ The engine defines specific error types for different scenarios:
 ### Key Configuration Options
 
 **Step Configuration**
-- `EnableState`: Controls whether step state should be tracked via StateKeeper
-- `StateOverrides`: Customizes state attributes (Name, Reason, Message) when EnableState is true
+- `State`: Configures step state tracking. If set, the step's execution state will be persisted via StateKeeper.
+  - `Name`: Required condition name when State is set (fallback to step name for backward compatibility)
+  - `Reason`: Optional reason for the state when step succeeds
+  - `Message`: Optional message for the state when step succeeds
 - `ContinueOnError`: Continue flow even if step fails
 - `SkipStepStateCheck`: Run step even if already succeeded
 - `AbortOnPredicatesFalse`: Control predicate failure behavior
@@ -96,9 +98,10 @@ The engine defines specific error types for different scenarios:
 - Provide meaningful summary information for debugging
 
 ### Step Implementation Best Practices
-- Enable state tracking with `EnableState: true` for steps that need persistence
-- Use `StateOverrides` to customize condition names, reasons, and messages for K8s
-- Use meaningful step names that map well to condition names in K8s (when StateOverrides.Name is not provided)
+- Enable state tracking by setting `State: &State{Name: "step-name"}` for steps that need persistence
+- Always provide explicit `State.Name` when creating State objects
+- Use `State.Reason` and `State.Message` for custom success messages
+- Use meaningful step names as fallback when State.Name is not provided (for backward compatibility)
 - Consider using predicates for conditional execution
 - Implement proper cleanup in `OnFail` callbacks
 

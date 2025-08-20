@@ -65,8 +65,8 @@ func main() {
 	// Define the workflow with parallel processing
 	steps := []lifecycle.Step{
 		&lifecycle.SingleStep{
-			Name:        "initialize",
-			EnableState: true,
+			Name:  "initialize",
+			State: &lifecycle.State{Name: "initialize"},
 			Run: func(ctx context.Context) error {
 				fmt.Printf("[%s] Initializing parallel processing system...\n",
 					time.Now().Format("15:04:05.000"))
@@ -120,8 +120,8 @@ func main() {
 		},
 
 		&lifecycle.SingleStep{
-			Name:        "aggregate-results",
-			EnableState: true,
+			Name:  "aggregate-results",
+			State: &lifecycle.State{Name: "aggregate-results"},
 			Run: func(ctx context.Context) error {
 				fmt.Printf("[%s] Aggregating results from all parallel operations...\n",
 					time.Now().Format("15:04:05.000"))
@@ -133,8 +133,8 @@ func main() {
 		},
 
 		&lifecycle.SingleStep{
-			Name:        "finalize",
-			EnableState: true,
+			Name:  "finalize",
+			State: &lifecycle.State{Name: "finalize"},
 			Run: func(ctx context.Context) error {
 				fmt.Printf("[%s] Finalizing parallel processing workflow...\n",
 					time.Now().Format("15:04:05.000"))

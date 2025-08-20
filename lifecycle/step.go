@@ -7,10 +7,10 @@ import (
 	"github.com/weka/go-steps-engine/util"
 )
 
-// StepStateOverrides allows customizing step state attributes.
-// When EnableState is true and overrides are not provided, sensible defaults are used.
-type StepStateOverrides struct {
-	// Name of the state condition. If empty, defaults to step name.
+// State configures step state tracking. If set, the step's execution state will be persisted via StateKeeper.
+// Name field is required when State is set.
+type State struct {
+	// Name of the state condition. Required when State is set.
 	Name string
 	// Reason for the state when step succeeds. If empty, uses default.
 	Reason string
@@ -23,13 +23,9 @@ type SingleStep struct {
 	// NOTE: put explicit name for throttled funcs to ensure it's static and not affected by magic names change
 	Name string
 
-	// EnableState controls whether step state should be tracked.
-	// When true, the step's execution state will be persisted via StateKeeper.
-	EnableState bool
-
-	// StateOverrides allows customizing state attributes when EnableState is true.
-	// If not provided or fields are empty, sensible defaults are used.
-	StateOverrides StepStateOverrides
+	// State configures step state tracking. If set, the step's execution state will be persisted via StateKeeper.
+	// If nil, no state tracking is performed.
+	State *State
 
 	// Should the step be run if the state is already succeeded
 	// Preconditions will also be evaluated and must be true
@@ -74,39 +70,29 @@ func (s *SingleStep) GetName() string {
 }
 
 func (s *SingleStep) HasState() bool {
-	return s.EnableState
+	return s.State != nil
 }
 
 func (s *SingleStep) GetStepStateName() string {
-	if !s.EnableState {
+	if s.State == nil {
 		return ""
 	}
-	if s.StateOverrides.Name != "" {
-		return s.StateOverrides.Name
+	if s.State.Name != "" {
+		return s.State.Name
 	}
-	// Fallback to step name if no override provided
+	// Fallback to step name if no name provided in State
 	return s.GetName()
 }
 
 func (s *SingleStep) GetSucceededState() *StepState {
-	if !s.EnableState {
+	if s.State == nil {
 		return nil
-	}
-
-	reason := ""
-	if s.StateOverrides.Reason != "" {
-		reason = s.StateOverrides.Reason
-	}
-
-	message := ""
-	if s.StateOverrides.Message != "" {
-		message = s.StateOverrides.Message
 	}
 
 	return &StepState{
 		Name:    s.GetStepStateName(),
-		Reason:  reason,
-		Message: message,
+		Reason:  s.State.Reason,
+		Message: s.State.Message,
 		Status:  StepStatusSucceeded,
 	}
 }

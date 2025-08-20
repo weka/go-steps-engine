@@ -132,20 +132,20 @@ func (o *FsdbStateKeeper) SupportsRunningState() bool {
 ```go
 steps := []lifecycle.Step{
     &lifecycle.SingleStep{
-        Name:        "validate-input",
-        EnableState: true,
-        Run:         validateInput,
+        Name:  "validate-input",
+        State: &lifecycle.State{Name: "validate-input"},
+        Run:   validateInput,
     },
     &lifecycle.SingleStep{
-        Name:        "process-data",
-        EnableState: true,
-        Run:         processData,
+        Name:  "process-data",
+        State: &lifecycle.State{Name: "process-data"},
+        Run:   processData,
         // This step depends on validate-input succeeding
     },
     &lifecycle.SingleStep{
-        Name:        "save-results",
-        EnableState: true,
-        Run:         saveResults,
+        Name:  "save-results",
+        State: &lifecycle.State{Name: "save-results"},
+        Run:   saveResults,
     },
 }
 ```
@@ -165,17 +165,33 @@ parallelStep := &lifecycle.ParallelSteps{
 
 ### State-Aware Steps
 
+Enable state tracking by providing a `State` struct. If you want state tracking, set `State` to a non-nil value with an explicit `Name` field. If you don't want state tracking, omit `State` or set it to `nil`.
+
 ```go
+// Basic state tracking with explicit name
 step := &lifecycle.SingleStep{
-    Name:        "deploy-app",
-    EnableState: true,
-    StateOverrides: lifecycle.StepStateOverrides{
-        Name:    "AppDeployed",           // Condition name in K8s
-        Reason:  "DeploymentReady",
-        Message: "Application deployed successfully",
+    Name:  "deploy-app",
+    State: &lifecycle.State{Name: "deploy-app"}, // Explicit state name required
+    Run:   deployApplication,
+}
+
+// Advanced state tracking with custom condition name and messages
+step := &lifecycle.SingleStep{
+    Name: "deploy-app",
+    State: &lifecycle.State{
+        Name:    "AppDeployed",                    // Required: Custom condition name in K8s
+        Reason:  "DeploymentReady",               // Optional: Custom reason for success
+        Message: "Application deployed successfully", // Optional: Custom success message
     },
     Run: deployApplication,
     // Skip this step if AppDeployed condition is already True
+}
+
+// No state tracking
+step := &lifecycle.SingleStep{
+    Name: "temporary-operation",
+    // State: nil (default) - no state tracking
+    Run: temporaryOperation,
 }
 ```
 
@@ -272,26 +288,23 @@ func (r *MyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
     // Define reconciliation steps
     steps := []lifecycle.Step{
         &lifecycle.SingleStep{
-            Name:        "validate-spec",
-            EnableState: true,
-            StateOverrides: lifecycle.StepStateOverrides{
-                Name: "SpecValid",
+            Name: "validate-spec",
+            State: &lifecycle.State{
+                Name: "SpecValid",  // Required explicit name
             },
             Run: r.validateSpec,
         },
         &lifecycle.SingleStep{
-            Name:        "deploy-resources",
-            EnableState: true,
-            StateOverrides: lifecycle.StepStateOverrides{
-                Name: "ResourcesDeployed",
+            Name: "deploy-resources",
+            State: &lifecycle.State{
+                Name: "ResourcesDeployed",  // Required explicit name
             },
             Run: r.deployResources,
         },
         &lifecycle.SingleStep{
-            Name:        "wait-ready",
-            EnableState: true,
-            StateOverrides: lifecycle.StepStateOverrides{
-                Name: "Ready",
+            Name: "wait-ready",
+            State: &lifecycle.State{
+                Name: "Ready",  // Required explicit name
             },
             Run: r.waitForReady,
         },
@@ -367,7 +380,8 @@ func TestWithRealStateKeeper(t *testing.T) {
 ## Best Practices
 
 1. **State Management**
-   - Use meaningful step names that map well to condition names
+   - Always provide explicit `State.Name` when using state tracking
+   - Use meaningful state names that map well to condition names
    - Provide clear reasons and messages for debugging
    - Consider whether your StateKeeper needs to track running states
 

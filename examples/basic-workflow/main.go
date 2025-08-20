@@ -32,8 +32,8 @@ func main() {
 	// Define workflow steps
 	steps := []lifecycle.Step{
 		&lifecycle.SingleStep{
-			Name:        "initialize",
-			EnableState: true,
+			Name:  "initialize",
+			State: &lifecycle.State{Name: "initialize"},
 			Run: func(ctx context.Context) error {
 				fmt.Println("Initializing application...")
 				time.Sleep(100 * time.Millisecond) // Simulate work
@@ -42,8 +42,8 @@ func main() {
 			},
 		},
 		&lifecycle.SingleStep{
-			Name:        "validate-config",
-			EnableState: true,
+			Name:  "validate-config",
+			State: &lifecycle.State{Name: "validate-config"},
 			Run: func(ctx context.Context) error {
 				fmt.Println("Validating configuration...")
 				time.Sleep(50 * time.Millisecond) // Simulate work
@@ -52,8 +52,8 @@ func main() {
 			},
 		},
 		&lifecycle.SingleStep{
-			Name:        "setup-resources",
-			EnableState: true,
+			Name:  "setup-resources",
+			State: &lifecycle.State{Name: "setup-resources"},
 			Run: func(ctx context.Context) error {
 				fmt.Println("Setting up resources...")
 				time.Sleep(200 * time.Millisecond) // Simulate work
@@ -62,8 +62,8 @@ func main() {
 			},
 		},
 		&lifecycle.SingleStep{
-			Name:        "start-services",
-			EnableState: true,
+			Name:  "start-services",
+			State: &lifecycle.State{Name: "start-services"},
 			Run: func(ctx context.Context) error {
 				fmt.Println("Starting services...")
 				time.Sleep(150 * time.Millisecond) // Simulate work
