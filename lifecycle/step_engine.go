@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weka/go-weka-observability/instrumentation"
 	"go.opentelemetry.io/otel/codes"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/weka/go-weka-observability/instrumentation"
 
 	"github.com/weka/go-steps-engine/throttling"
 )
@@ -163,6 +164,8 @@ type StepsEngine struct {
 	StateKeeper StateKeeper
 	Throttler   throttling.Throttler
 	Steps       []Step
+	// Optional context enhancer function (per step)
+	WithStepContext func(ctx context.Context, stepName string) context.Context
 }
 
 func (r *StepsEngine) Run(ctx context.Context) error {
@@ -228,7 +231,12 @@ STEPS:
 			}
 		}
 
-		stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(ctx, step.GetName())
+		stepCtx := ctx
+		if r.WithStepContext != nil {
+			stepCtx = r.WithStepContext(stepCtx, step.GetName())
+		}
+
+		stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(stepCtx, step.GetName())
 		stepEnd = spanEnd
 		defer spanEnd() // in case we dont handle it will in terms of closing in for loop
 
