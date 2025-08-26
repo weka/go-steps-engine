@@ -9,6 +9,15 @@ import (
 type DynamicStep struct {
 	// Name of the step
 	Name string
+
+	// State configures step state tracking. If set, the step's execution state will be persisted via StateKeeper.
+	// If nil, no state tracking is performed.
+	State *State
+
+	// Should the step be run if the state is already succeeded
+	// Preconditions will also be evaluated and must be true
+	SkipStepStateCheck bool
+
 	// Predicates must all be true for the step to be executed
 	Predicates []PredicateFunc
 	// Abort the whole flow if one of the predicates is false
@@ -35,6 +44,10 @@ type DynamicStep struct {
 func (s *DynamicStep) getStep() Step {
 	if s.step == nil {
 		s.step = s.GetStep()
+		// Propagate DynamicStep's state configuration to the nested step
+		if s.HasState() {
+			s.step.SetState(s.State)
+		}
 	}
 
 	return s.step
@@ -64,18 +77,39 @@ func (s *DynamicStep) GetPredicates() []PredicateFunc {
 }
 
 func (s *DynamicStep) HasState() bool {
-	return false
-}
-
-func (s *DynamicStep) GetSucceededState() *StepState {
-	panic("not supported for DynamicStep")
+	return s.State != nil
 }
 
 func (s *DynamicStep) GetStepStateName() string {
-	panic("not supported for DynamicStep")
+	if s.State == nil {
+		return ""
+	}
+	if s.State.Name != "" {
+		return s.State.Name
+	}
+	// Fallback to step name if no name provided in State
+	return s.GetName()
 }
 
-func (s *DynamicStep) ShouldSkip(ctx context.Context, object StateKeeper) bool {
+func (s *DynamicStep) GetSucceededState() *StepState {
+	if s.State == nil {
+		return nil
+	}
+
+	return &StepState{
+		Name:    s.GetStepStateName(),
+		Reason:  s.State.Reason,
+		Message: s.State.Message,
+		Status:  StepStatusSucceeded,
+	}
+}
+
+func (s *DynamicStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
+	// Check if step is already done or if it should be able to run again
+	if stateKeeper != nil && s.HasState() && !s.SkipStepStateCheck {
+		state, _ := stateKeeper.GetStepState(ctx, s.GetStepStateName())
+		return state != nil && state.StatusEqual(StepStatusSucceeded)
+	}
 	return false
 }
 
@@ -112,4 +146,8 @@ func (s *DynamicStep) RunStep(ctx context.Context) error {
 		Throttler:   s.Throttler,
 	}
 	return reconSteps.Run(ctx)
+}
+
+func (s *DynamicStep) SetState(state *State) {
+	s.State = state
 }

@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weka/go-weka-observability/instrumentation"
 	"go.opentelemetry.io/otel/codes"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/weka/go-weka-observability/instrumentation"
 
 	"github.com/weka/go-steps-engine/throttling"
 )
@@ -92,6 +91,8 @@ type Step interface {
 	GetSucceededState() *StepState
 	// Set the stateKeeper and throttler for the step
 	SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler)
+	// Set the state configuration for the step
+	SetState(state *State)
 }
 
 // StateKeeper manages the persistent state of steps during execution.
@@ -306,7 +307,7 @@ STEPS:
 
 		// Update state in case of success
 		if step.HasState() && r.StateKeeper != nil {
-			state, _ := r.StateKeeper.GetStepState(stepCtx, step.GetName())
+			state, _ := r.StateKeeper.GetStepState(stepCtx, step.GetStepStateName())
 
 			if state == nil || !state.StatusEqual(StepStatusSucceeded) {
 				state = step.GetSucceededState()
