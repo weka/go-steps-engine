@@ -144,3 +144,7 @@ func (s *ParallelSteps) RunStep(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (s *ParallelSteps) SetState(state *State) {
+	panic("ParallelSteps does not support SetState")
+}

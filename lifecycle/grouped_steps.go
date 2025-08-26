@@ -9,6 +9,15 @@ import (
 type GroupedSteps struct {
 	// Name of the steps group
 	Name string
+
+	// State configures step state tracking. If set, the step's execution state will be persisted via StateKeeper.
+	// If nil, no state tracking is performed.
+	State *State
+
+	// Should the step be run if the state is already succeeded
+	// Preconditions will also be evaluated and must be true
+	SkipStepStateCheck bool
+
 	// Predicates must all be true for the step to be executed
 	Predicates []PredicateFunc
 	// Abort the whole flow if one of the predicates is false
@@ -54,18 +63,39 @@ func (s *GroupedSteps) GetPredicates() []PredicateFunc {
 }
 
 func (s *GroupedSteps) HasState() bool {
-	return false
+	return s.State != nil
 }
 
 func (s *GroupedSteps) GetStepStateName() string {
-	panic("not supported for GroupedSteps")
+	if s.State == nil {
+		return ""
+	}
+	if s.State.Name != "" {
+		return s.State.Name
+	}
+	// Fallback to step name if no name provided in State
+	return s.GetName()
 }
 
 func (s *GroupedSteps) GetSucceededState() *StepState {
-	panic("not supported for GroupedSteps")
+	if s.State == nil {
+		return nil
+	}
+
+	return &StepState{
+		Name:    s.GetStepStateName(),
+		Reason:  s.State.Reason,
+		Message: s.State.Message,
+		Status:  StepStatusSucceeded,
+	}
 }
 
-func (s *GroupedSteps) ShouldSkip(ctx context.Context, object StateKeeper) bool {
+func (s *GroupedSteps) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
+	// Check if step is already done or if it should be able to run again
+	if stateKeeper != nil && s.HasState() && !s.SkipStepStateCheck {
+		state, _ := stateKeeper.GetStepState(ctx, s.GetStepStateName())
+		return state != nil && state.StatusEqual(StepStatusSucceeded)
+	}
 	return false
 }
 
@@ -102,4 +132,8 @@ func (s *GroupedSteps) RunStep(ctx context.Context) error {
 		Throttler:   s.Throttler,
 	}
 	return reconSteps.Run(ctx)
+}
+
+func (s *GroupedSteps) SetState(state *State) {
+	s.State = state
 }

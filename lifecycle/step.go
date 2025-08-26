@@ -140,3 +140,7 @@ func (s *SingleStep) HasNestedSteps() bool {
 func (s *SingleStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
 	panic("SingleStep does not support SetStateKeeperAndThrottler")
 }
+
+func (s *SingleStep) SetState(state *State) {
+	s.State = state
+}
