@@ -17,7 +17,7 @@ func (e *ParallelStepsError) Error() string {
 	return fmt.Sprintf("parallel steps failed: %v", e.Errors)
 }
 
-type SimpleStep struct {
+type ParallelSubStep struct {
 	// Name of the step
 	Name string
 	// Predicates must all be true for the step to be executed
@@ -34,7 +34,7 @@ type ParallelSteps struct {
 	// Abort the whole flow if one of the predicates is false
 	AbortOnPredicatesFalse bool
 	// The steps to execute in parallel
-	Steps []SimpleStep
+	Steps []ParallelSubStep
 	// The function to execute if the step is failed
 	OnFail func(context.Context, string, error) error
 	// fields to pass to the nested steps engine
@@ -110,7 +110,7 @@ func (s *ParallelSteps) RunStep(ctx context.Context) error {
 	// Run all steps in parallel
 	errs := make(chan error, len(s.Steps))
 	for _, step := range s.Steps {
-		go func(ctx context.Context, step SimpleStep) {
+		go func(ctx context.Context, step ParallelSubStep) {
 			stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(ctx, step.Name)
 			defer spanEnd()
 

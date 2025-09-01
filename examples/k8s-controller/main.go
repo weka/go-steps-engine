@@ -76,7 +76,7 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Define reconciliation steps
 	steps := []lifecycle.Step{
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name: "validate-spec",
 			State: &lifecycle.State{
 				Name:    "SpecValid",
@@ -98,7 +98,7 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return nil
 			},
 		},
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name: "create-deployment",
 			State: &lifecycle.State{
 				Name:    "DeploymentReady",
@@ -121,7 +121,7 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return nil
 			},
 		},
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name: "create-service",
 			State: &lifecycle.State{
 				Name:    "ServiceReady",
@@ -139,7 +139,7 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return nil
 			},
 		},
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name: "finalize-status",
 			State: &lifecycle.State{
 				Name:    "Ready",

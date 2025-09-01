@@ -38,7 +38,7 @@ The go-steps-engine is a state-aware step execution framework with these key com
 - Not all StateKeepers support running state (check `SupportsRunningState()`)
 
 **Step Types**
-- `SingleStep` (`lifecycle/step.go`): Basic sequential execution
+- `SimpleStep` (`lifecycle/step.go`): Basic sequential execution
 - `ParallelSteps` (`lifecycle/parallel_steps.go`): Concurrent execution
 - `GroupedSteps` (`lifecycle/grouped_steps.go`): Steps with dependencies
 - `DynamicStep` (`lifecycle/dynamic_step.go`): Runtime step generation

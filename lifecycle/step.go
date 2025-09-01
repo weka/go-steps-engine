@@ -18,7 +18,7 @@ type State struct {
 	Message string
 }
 
-type SingleStep struct {
+type SimpleStep struct {
 	// Name of the step
 	// NOTE: put explicit name for throttled funcs to ensure it's static and not affected by magic names change
 	Name string
@@ -53,15 +53,15 @@ type SingleStep struct {
 	Throttling *throttling.ThrottlingSettings
 }
 
-func (s *SingleStep) RunStep(ctx context.Context) error {
+func (s *SimpleStep) RunStep(ctx context.Context) error {
 	return s.Run(ctx)
 }
 
-func (s *SingleStep) ShouldFinishOnSuccess() bool {
+func (s *SimpleStep) ShouldFinishOnSuccess() bool {
 	return s.FinishOnSuccess
 }
 
-func (s *SingleStep) GetName() string {
+func (s *SimpleStep) GetName() string {
 	if s.Name == "" {
 		// Get name of the function that is run by the step
 		return util.GetFunctionName(s.Run)
@@ -69,11 +69,11 @@ func (s *SingleStep) GetName() string {
 	return s.Name
 }
 
-func (s *SingleStep) HasState() bool {
+func (s *SimpleStep) HasState() bool {
 	return s.State != nil
 }
 
-func (s *SingleStep) GetStepStateName() string {
+func (s *SimpleStep) GetStepStateName() string {
 	if s.State == nil {
 		return ""
 	}
@@ -84,7 +84,7 @@ func (s *SingleStep) GetStepStateName() string {
 	return s.GetName()
 }
 
-func (s *SingleStep) GetSucceededState() *StepState {
+func (s *SimpleStep) GetSucceededState() *StepState {
 	if s.State == nil {
 		return nil
 	}
@@ -97,22 +97,22 @@ func (s *SingleStep) GetSucceededState() *StepState {
 	}
 }
 
-func (s *SingleStep) ShouldAbortOnFalsePredicates() bool {
+func (s *SimpleStep) ShouldAbortOnFalsePredicates() bool {
 	return s.AbortOnPredicatesFalse
 }
 
-func (s *SingleStep) ShouldContinueOnError() bool {
+func (s *SimpleStep) ShouldContinueOnError() bool {
 	return s.ContinueOnError
 }
 
-func (s *SingleStep) GetPredicates() []PredicateFunc {
+func (s *SimpleStep) GetPredicates() []PredicateFunc {
 	if s.Predicates == nil {
 		return []PredicateFunc{}
 	}
 	return s.Predicates
 }
 
-func (s *SingleStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
+func (s *SimpleStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
 	// Check if step is already done or if it should be able to run again
 	if stateKeeper != nil && s.HasState() && !s.SkipStepStateCheck {
 		state, _ := stateKeeper.GetStepState(ctx, s.GetStepStateName())
@@ -121,26 +121,26 @@ func (s *SingleStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bo
 	return false
 }
 
-func (s *SingleStep) GetFailureCallback() func(context.Context, string, error) error {
+func (s *SimpleStep) GetFailureCallback() func(context.Context, string, error) error {
 	return s.OnFail
 }
 
-func (s *SingleStep) IsThrottled() bool {
+func (s *SimpleStep) IsThrottled() bool {
 	return s.Throttling != nil
 }
 
-func (s *SingleStep) GetThrottlingSettings() *throttling.ThrottlingSettings {
+func (s *SimpleStep) GetThrottlingSettings() *throttling.ThrottlingSettings {
 	return s.Throttling
 }
 
-func (s *SingleStep) HasNestedSteps() bool {
+func (s *SimpleStep) HasNestedSteps() bool {
 	return false
 }
 
-func (s *SingleStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
-	panic("SingleStep does not support SetStateKeeperAndThrottler")
+func (s *SimpleStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
+	panic("SimpleStep does not support SetStateKeeperAndThrottler")
 }
 
-func (s *SingleStep) SetState(state *State) {
+func (s *SimpleStep) SetState(state *State) {
 	s.State = state
 }
