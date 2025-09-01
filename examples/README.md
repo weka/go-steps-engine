@@ -14,7 +14,7 @@ A simple sequential workflow demonstrating the fundamental concepts:
 - State persistence and retrieval
 
 **Key Concepts:**
-- `SingleStep` usage
+- `SimpleStep` usage
 - `StateKeeper` interface implementation
 - Basic workflow patterns
 
@@ -141,7 +141,7 @@ Each example demonstrates different StateKeeper implementations:
 
 ### Step Types Used
 
-- **SingleStep**: Individual sequential operations
+- **SimpleStep**: Individual sequential operations
 - **ParallelSteps**: Concurrent execution of independent operations
 - **Error handling**: ExpectedError, WaitError, and failure callbacks
 

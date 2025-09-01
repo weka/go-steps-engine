@@ -27,14 +27,14 @@ func main() {
     
     // Create steps
     steps := []lifecycle.Step{
-        &lifecycle.SingleStep{
+        &lifecycle.SimpleStep{
             Name: "initialize",
             Run: func(ctx context.Context) error {
                 // Your initialization logic here
                 return nil
             },
         },
-        &lifecycle.SingleStep{
+        &lifecycle.SimpleStep{
             Name: "process",
             Run: func(ctx context.Context) error {
                 // Your processing logic here
@@ -79,7 +79,7 @@ type StateKeeper interface {
 ```
 
 #### Step Types
-- **SingleStep**: Basic sequential step execution
+- **SimpleStep**: Basic sequential step execution
 - **ParallelSteps**: Execute multiple steps concurrently
 - **GroupedSteps**: Execute steps in groups with dependencies
 - **DynamicStep**: Steps that generate other steps dynamically
@@ -131,18 +131,18 @@ func (o *FsdbStateKeeper) SupportsRunningState() bool {
 
 ```go
 steps := []lifecycle.Step{
-    &lifecycle.SingleStep{
+    &lifecycle.SimpleStep{
         Name:  "validate-input",
         State: &lifecycle.State{Name: "validate-input"},
         Run:   validateInput,
     },
-    &lifecycle.SingleStep{
+    &lifecycle.SimpleStep{
         Name:  "process-data",
         State: &lifecycle.State{Name: "process-data"},
         Run:   processData,
         // This step depends on validate-input succeeding
     },
-    &lifecycle.SingleStep{
+    &lifecycle.SimpleStep{
         Name:  "save-results",
         State: &lifecycle.State{Name: "save-results"},
         Run:   saveResults,
@@ -155,7 +155,7 @@ steps := []lifecycle.Step{
 ```go
 parallelStep := &lifecycle.ParallelSteps{
     Name: "parallel-processing",
-    Steps: []lifecycle.SimpleStep{
+    Steps: []lifecycle.ParallelSubStep{
         {Name: "process-batch-1", Run: processBatch1},
         {Name: "process-batch-2", Run: processBatch2},
         {Name: "process-batch-3", Run: processBatch3},
@@ -169,14 +169,14 @@ Enable state tracking by providing a `State` struct. If you want state tracking,
 
 ```go
 // Basic state tracking with explicit name
-step := &lifecycle.SingleStep{
+step := &lifecycle.SimpleStep{
     Name:  "deploy-app",
     State: &lifecycle.State{Name: "deploy-app"}, // Explicit state name required
     Run:   deployApplication,
 }
 
 // Advanced state tracking with custom condition name and messages
-step := &lifecycle.SingleStep{
+step := &lifecycle.SimpleStep{
     Name: "deploy-app",
     State: &lifecycle.State{
         Name:    "AppDeployed",                    // Required: Custom condition name in K8s
@@ -188,7 +188,7 @@ step := &lifecycle.SingleStep{
 }
 
 // No state tracking
-step := &lifecycle.SingleStep{
+step := &lifecycle.SimpleStep{
     Name: "temporary-operation",
     // State: nil (default) - no state tracking
     Run: temporaryOperation,
@@ -198,7 +198,7 @@ step := &lifecycle.SingleStep{
 ### Error Handling
 
 ```go
-step := &lifecycle.SingleStep{
+step := &lifecycle.SimpleStep{
     Name: "risky-operation",
     Run: riskyOperation,
     ContinueOnError: true,  // Continue even if this step fails
@@ -213,7 +213,7 @@ step := &lifecycle.SingleStep{
 ### Predicates and Conditional Execution
 
 ```go
-step := &lifecycle.SingleStep{
+step := &lifecycle.SimpleStep{
     Name: "conditional-step",
     Run: conditionalOperation,
     Predicates: []lifecycle.PredicateFunc{
@@ -228,7 +228,7 @@ step := &lifecycle.SingleStep{
 ### Throttling
 
 ```go
-step := &lifecycle.SingleStep{
+step := &lifecycle.SimpleStep{
     Name: "rate-limited-operation",
     Run: expensiveOperation,
     Throttling: &throttling.ThrottlingSettings{
@@ -287,21 +287,21 @@ func (r *MyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Re
     
     // Define reconciliation steps
     steps := []lifecycle.Step{
-        &lifecycle.SingleStep{
+        &lifecycle.SimpleStep{
             Name: "validate-spec",
             State: &lifecycle.State{
                 Name: "SpecValid",  // Required explicit name
             },
             Run: r.validateSpec,
         },
-        &lifecycle.SingleStep{
+        &lifecycle.SimpleStep{
             Name: "deploy-resources",
             State: &lifecycle.State{
                 Name: "ResourcesDeployed",  // Required explicit name
             },
             Run: r.deployResources,
         },
-        &lifecycle.SingleStep{
+        &lifecycle.SimpleStep{
             Name: "wait-ready",
             State: &lifecycle.State{
                 Name: "Ready",  // Required explicit name
@@ -350,7 +350,7 @@ func TestMyStep(t *testing.T) {
     // Create mock StateKeeper if needed
     stateKeeper := &MockStateKeeper{}
     
-    step := &lifecycle.SingleStep{
+    step := &lifecycle.SimpleStep{
         Name: "test-step",
         Run: func(ctx context.Context) error {
             // Your step logic

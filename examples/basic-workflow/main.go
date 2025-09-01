@@ -31,7 +31,7 @@ func main() {
 
 	// Define workflow steps
 	steps := []lifecycle.Step{
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "initialize",
 			State: &lifecycle.State{Name: "initialize"},
 			Run: func(ctx context.Context) error {
@@ -41,7 +41,7 @@ func main() {
 				return nil
 			},
 		},
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "validate-config",
 			State: &lifecycle.State{Name: "validate-config"},
 			Run: func(ctx context.Context) error {
@@ -51,7 +51,7 @@ func main() {
 				return nil
 			},
 		},
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "setup-resources",
 			State: &lifecycle.State{Name: "setup-resources"},
 			Run: func(ctx context.Context) error {
@@ -61,7 +61,7 @@ func main() {
 				return nil
 			},
 		},
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "start-services",
 			State: &lifecycle.State{Name: "start-services"},
 			Run: func(ctx context.Context) error {

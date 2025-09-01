@@ -64,13 +64,13 @@ func TestStepEngineSuccess(t *testing.T) {
 
 	stepsEngine := StepsEngine{
 		Steps: []Step{
-			&SingleStep{
+			&SimpleStep{
 				Name: "test",
 				Run:  mockSuccess.Run,
 			},
 			&ParallelSteps{
 				Name: "test-parallel",
-				Steps: []SimpleStep{
+				Steps: []ParallelSubStep{
 					{
 						Name: "test-parallel-step1",
 						Run:  mockSuccess.Run,
@@ -104,11 +104,11 @@ func TestStepEngineFailOnFirstStep(t *testing.T) {
 
 	stepsEngine := StepsEngine{
 		Steps: []Step{
-			&SingleStep{
+			&SimpleStep{
 				Name: "test1",
 				Run:  mockFail.Run,
 			},
-			&SingleStep{
+			&SimpleStep{
 				Name: "test2",
 				Run:  mockFail.Run,
 			},
@@ -142,7 +142,7 @@ func TestDynamicStepWithState(t *testing.T) {
 			Message: "Test message",
 		},
 		GetStep: func() Step {
-			return &SingleStep{
+			return &SimpleStep{
 				Name: "inner-step",
 				Run:  mockSuccess.Run,
 			}
@@ -171,7 +171,7 @@ func TestDynamicStepWithState(t *testing.T) {
 		Name:  "fallback-step",
 		State: &State{}, // Empty State.Name
 		GetStep: func() Step {
-			return &SingleStep{Name: "inner", Run: mockSuccess.Run}
+			return &SimpleStep{Name: "inner", Run: mockSuccess.Run}
 		},
 	}
 	assert.Equal(t, "fallback-step", dynamicStepNoStateName.GetStepStateName())
@@ -187,8 +187,8 @@ func TestGroupedStepsWithState(t *testing.T) {
 	mockStateKeeper := &MockStateKeeper{}
 
 	// Create steps without state
-	step1 := &SingleStep{Name: "step1", Run: mockSuccess.Run}
-	step2 := &SingleStep{Name: "step2", Run: mockSuccess.Run}
+	step1 := &SimpleStep{Name: "step1", Run: mockSuccess.Run}
+	step2 := &SimpleStep{Name: "step2", Run: mockSuccess.Run}
 
 	// Create grouped steps without state initially
 	groupedSteps := &GroupedSteps{

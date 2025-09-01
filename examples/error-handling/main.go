@@ -63,7 +63,7 @@ func main() {
 	// Define workflow with various error handling patterns
 	steps := []lifecycle.Step{
 		// Step 1: Basic successful step
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "initialize",
 			State: &lifecycle.State{Name: "initialize"},
 			Run: func(ctx context.Context) error {
@@ -74,7 +74,7 @@ func main() {
 		},
 
 		// Step 2: Expected error that doesn't stop the workflow
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "check-optional-feature",
 			State: &lifecycle.State{Name: "check-optional-feature"},
 			Run: func(ctx context.Context) error {
@@ -93,7 +93,7 @@ func main() {
 		},
 
 		// Step 3: Wait error for retryable conditions
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "wait-for-service",
 			State: &lifecycle.State{Name: "wait-for-service"},
 			Run: func(ctx context.Context) error {
@@ -110,7 +110,7 @@ func main() {
 		},
 
 		// Step 4: Step that might fail but has cleanup logic
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:   "risky-operation",
 			State:  &lifecycle.State{Name: "risky-operation"},
 			OnFail: cleanupResources,
@@ -129,7 +129,7 @@ func main() {
 		},
 
 		// Step 5: Non-critical step that continues on error
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:            "send-notification",
 			State:           &lifecycle.State{Name: "send-notification"},
 			ContinueOnError: true, // Don't stop the workflow if this fails
@@ -148,7 +148,7 @@ func main() {
 		},
 
 		// Step 6: Final validation step
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "validate-completion",
 			State: &lifecycle.State{Name: "validate-completion"},
 			Run: func(ctx context.Context) error {
@@ -173,7 +173,7 @@ func main() {
 		},
 
 		// Step 7: Finalization
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "finalize",
 			State: &lifecycle.State{Name: "finalize"},
 			Run: func(ctx context.Context) error {

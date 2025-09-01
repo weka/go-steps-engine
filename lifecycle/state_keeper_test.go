@@ -380,7 +380,7 @@ func TestStepsEngine_WithMockStateKeeper(t *testing.T) {
 	defer shutdown(ctx)
 
 	callCount := 0
-	testStep := &SingleStep{
+	testStep := &SimpleStep{
 		Name:  "test-step",
 		State: &State{Name: "test-step"},
 		Run: func(ctx context.Context) error {
@@ -458,7 +458,7 @@ func TestStepsEngine_SetRunningStateForFSDB(t *testing.T) {
 
 	stateRecorder := NewStateTransitionRecorder() // Supports running state by default
 
-	testStep := &SingleStep{
+	testStep := &SimpleStep{
 		Name:  "test-step",
 		State: &State{Name: "test-step"},
 		Run: func(ctx context.Context) error {

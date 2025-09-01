@@ -64,7 +64,7 @@ func main() {
 
 	// Define the workflow with parallel processing
 	steps := []lifecycle.Step{
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "initialize",
 			State: &lifecycle.State{Name: "initialize"},
 			Run: func(ctx context.Context) error {
@@ -80,7 +80,7 @@ func main() {
 		// Parallel data processing batches
 		&lifecycle.ParallelSteps{
 			Name: "process-data-batches",
-			Steps: []lifecycle.SimpleStep{
+			Steps: []lifecycle.ParallelSubStep{
 				{
 					Name: "process-batch-1",
 					Run:  processDataBatch("batch-1", 1000),
@@ -103,7 +103,7 @@ func main() {
 		// Parallel API calls
 		&lifecycle.ParallelSteps{
 			Name: "external-integrations",
-			Steps: []lifecycle.SimpleStep{
+			Steps: []lifecycle.ParallelSubStep{
 				{
 					Name: "user-service-api",
 					Run:  callExternalAPI("UserService"),
@@ -119,7 +119,7 @@ func main() {
 			},
 		},
 
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "aggregate-results",
 			State: &lifecycle.State{Name: "aggregate-results"},
 			Run: func(ctx context.Context) error {
@@ -132,7 +132,7 @@ func main() {
 			},
 		},
 
-		&lifecycle.SingleStep{
+		&lifecycle.SimpleStep{
 			Name:  "finalize",
 			State: &lifecycle.State{Name: "finalize"},
 			Run: func(ctx context.Context) error {
