@@ -17,15 +17,6 @@ func (e *ParallelStepsError) Error() string {
 	return fmt.Sprintf("parallel steps failed: %v", e.Errors)
 }
 
-type ParallelSubStep struct {
-	// Name of the step
-	Name string
-	// Predicates must all be true for the step to be executed
-	Predicates []PredicateFunc
-	// The function to execute
-	Run StepFunc
-}
-
 type ParallelSteps struct {
 	// Name of the parallel steps group
 	Name string
@@ -34,7 +25,7 @@ type ParallelSteps struct {
 	// Abort the whole flow if one of the predicates is false
 	AbortOnPredicatesFalse bool
 	// The steps to execute in parallel
-	Steps []ParallelSubStep
+	Steps []Step
 	// The function to execute if the step is failed
 	OnFail func(context.Context, string, error) error
 	// fields to pass to the nested steps engine
@@ -101,27 +92,54 @@ func (s *ParallelSteps) HasNestedSteps() bool {
 func (s *ParallelSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
 	s.StateKeeper = stateKeeper
 	s.Throttler = throttler
+
+	for _, step := range s.Steps {
+		if step.HasNestedSteps() {
+			step.SetStateKeeperAndThrottler(stateKeeper, throttler)
+		}
+	}
+}
+
+func (s *ParallelSteps) ValidateParallelSteps() error {
+	if len(s.Steps) == 0 {
+		return fmt.Errorf("no steps provided for parallel execution")
+	}
+	for _, step := range s.Steps {
+		if step.ShouldFinishOnSuccess() {
+			return fmt.Errorf("step %s in parallel steps cannot have ShouldFinishOnSuccess=true", step.GetName())
+		}
+		if step.ShouldContinueOnError() {
+			return fmt.Errorf("step %s in parallel steps cannot have ShouldContinueOnError=true", step.GetName())
+		}
+	}
+	return nil
 }
 
 func (s *ParallelSteps) RunStep(ctx context.Context) error {
 	ctx, _, end := instrumentation.GetLogSpan(ctx, "RunParallelSteps", "parallel_steps_group", s.Name)
 	defer end()
 
+	if err := s.ValidateParallelSteps(); err != nil {
+		return err
+	}
+
 	// Run all steps in parallel
 	errs := make(chan error, len(s.Steps))
 	for _, step := range s.Steps {
-		go func(ctx context.Context, step ParallelSubStep) {
-			stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(ctx, step.Name)
+		go func(ctx context.Context, step Step) {
+			stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(ctx, step.GetName())
 			defer spanEnd()
 
 			// Check preconditions
-			for _, predicate := range step.Predicates {
+			for _, predicate := range step.GetPredicates() {
 				if !predicate() {
+					stepLogger.Info("Skipping step due to predicate returning false")
+					errs <- nil
 					return
 				}
 			}
 
-			err := step.Run(stepCtx)
+			err := step.RunStep(stepCtx)
 			if err != nil {
 				stepLogger.SetError(err, "step failed")
 				stepLogger.SetValues("stop_err", err.Error())
