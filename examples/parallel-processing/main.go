@@ -80,20 +80,20 @@ func main() {
 		// Parallel data processing batches
 		&lifecycle.ParallelSteps{
 			Name: "process-data-batches",
-			Steps: []lifecycle.ParallelSubStep{
-				{
+			Steps: []lifecycle.Step{
+				&lifecycle.SimpleStep{
 					Name: "process-batch-1",
 					Run:  processDataBatch("batch-1", 1000),
 				},
-				{
+				&lifecycle.SimpleStep{
 					Name: "process-batch-2",
 					Run:  processDataBatch("batch-2", 1500),
 				},
-				{
+				&lifecycle.SimpleStep{
 					Name: "process-batch-3",
 					Run:  processDataBatch("batch-3", 800),
 				},
-				{
+				&lifecycle.SimpleStep{
 					Name: "process-batch-4",
 					Run:  processDataBatch("batch-4", 1200),
 				},
@@ -103,16 +103,16 @@ func main() {
 		// Parallel API calls
 		&lifecycle.ParallelSteps{
 			Name: "external-integrations",
-			Steps: []lifecycle.ParallelSubStep{
-				{
+			Steps: []lifecycle.Step{
+				&lifecycle.SimpleStep{
 					Name: "user-service-api",
 					Run:  callExternalAPI("UserService"),
 				},
-				{
+				&lifecycle.SimpleStep{
 					Name: "notification-service-api",
 					Run:  callExternalAPI("NotificationService"),
 				},
-				{
+				&lifecycle.SimpleStep{
 					Name: "analytics-service-api",
 					Run:  callExternalAPI("AnalyticsService"),
 				},

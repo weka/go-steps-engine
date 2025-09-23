@@ -13,6 +13,7 @@ import (
 	"github.com/go-logr/zerologr"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+
 	"github.com/weka/go-weka-observability/instrumentation"
 )
 
@@ -70,12 +71,12 @@ func TestStepEngineSuccess(t *testing.T) {
 			},
 			&ParallelSteps{
 				Name: "test-parallel",
-				Steps: []ParallelSubStep{
-					{
+				Steps: []Step{
+					&SimpleStep{
 						Name: "test-parallel-step1",
 						Run:  mockSuccess.Run,
 					},
-					{
+					&SimpleStep{
 						Name: "test-parallel-step2",
 						Run:  mockSuccess.Run,
 					},
