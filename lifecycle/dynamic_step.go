@@ -76,6 +76,10 @@ func (s *DynamicStep) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
+func (s *DynamicStep) AppendPredicate(predicate PredicateFunc) {
+	s.Predicates = append(s.Predicates, predicate)
+}
+
 func (s *DynamicStep) HasState() bool {
 	return s.State != nil
 }
@@ -127,6 +131,13 @@ func (s *DynamicStep) GetThrottlingSettings() *throttling.ThrottlingSettings {
 
 func (s *DynamicStep) HasNestedSteps() bool {
 	return true
+}
+
+func (s *DynamicStep) GetNestedSteps() []Step {
+	// DynamicStep wraps a single step that's generated at runtime
+	// Return nil to avoid eager generation (which may depend on runtime state)
+	// Selection logic should check the DynamicStep's name directly, not its nested steps
+	return nil
 }
 
 func (s *DynamicStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {

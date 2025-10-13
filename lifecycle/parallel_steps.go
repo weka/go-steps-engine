@@ -57,6 +57,10 @@ func (s *ParallelSteps) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
+func (s *ParallelSteps) AppendPredicate(predicate PredicateFunc) {
+	s.Predicates = append(s.Predicates, predicate)
+}
+
 func (s *ParallelSteps) HasState() bool {
 	return false
 }
@@ -87,6 +91,10 @@ func (s *ParallelSteps) GetThrottlingSettings() *throttling.ThrottlingSettings {
 
 func (s *ParallelSteps) HasNestedSteps() bool {
 	return true
+}
+
+func (s *ParallelSteps) GetNestedSteps() []Step {
+	return s.Steps
 }
 
 func (s *ParallelSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {

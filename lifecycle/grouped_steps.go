@@ -62,6 +62,10 @@ func (s *GroupedSteps) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
+func (s *GroupedSteps) AppendPredicate(predicate PredicateFunc) {
+	s.Predicates = append(s.Predicates, predicate)
+}
+
 func (s *GroupedSteps) HasState() bool {
 	return s.State != nil
 }
@@ -113,6 +117,10 @@ func (s *GroupedSteps) GetThrottlingSettings() *throttling.ThrottlingSettings {
 
 func (s *GroupedSteps) HasNestedSteps() bool {
 	return true
+}
+
+func (s *GroupedSteps) GetNestedSteps() []Step {
+	return s.Steps
 }
 
 func (s *GroupedSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
