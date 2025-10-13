@@ -67,6 +67,8 @@ type Step interface {
 	ShouldFinishOnSuccess() bool
 	// Get predicates that must be true for the step to be executed
 	GetPredicates() []PredicateFunc
+	// Append a predicate to the step's predicate list
+	AppendPredicate(predicate PredicateFunc)
 	// Should the whole flow be aborted if one of the predicates is false
 	ShouldAbortOnFalsePredicates() bool
 	// Should the whole flow proceed if the step fails
@@ -81,6 +83,8 @@ type Step interface {
 	GetName() string
 	// If the step has nested steps, return true
 	HasNestedSteps() bool
+	// Get nested steps (returns nil if HasNestedSteps() is false)
+	GetNestedSteps() []Step
 	// Should the step be skipped if the state is already true
 	ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool
 	// Does the step have a state to track

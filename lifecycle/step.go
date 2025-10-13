@@ -112,6 +112,10 @@ func (s *SimpleStep) GetPredicates() []PredicateFunc {
 	return s.Predicates
 }
 
+func (s *SimpleStep) AppendPredicate(predicate PredicateFunc) {
+	s.Predicates = append(s.Predicates, predicate)
+}
+
 func (s *SimpleStep) ShouldSkip(ctx context.Context, stateKeeper StateKeeper) bool {
 	// Check if step is already done or if it should be able to run again
 	if stateKeeper != nil && s.HasState() && !s.SkipStepStateCheck {
@@ -135,6 +139,10 @@ func (s *SimpleStep) GetThrottlingSettings() *throttling.ThrottlingSettings {
 
 func (s *SimpleStep) HasNestedSteps() bool {
 	return false
+}
+
+func (s *SimpleStep) GetNestedSteps() []Step {
+	return nil
 }
 
 func (s *SimpleStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
