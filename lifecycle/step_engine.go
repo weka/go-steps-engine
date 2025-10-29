@@ -388,7 +388,7 @@ func (r *StepsEngine) RunAsReconcilerResponse(ctx context.Context) (ctrl.Result,
 				unpackTarget = unpacked.Err
 			}
 		}
-		logger.Error(err, "Error processing reconciliation steps")
+		logger.SetError(err, "Error processing reconciliation steps")
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 	logger.Info("Reconciliation steps completed successfully")
