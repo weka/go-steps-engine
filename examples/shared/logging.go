@@ -20,7 +20,7 @@ func SetupLogging(ctx context.Context, serviceName string) (logger logr.Logger, 
 	zeroLogger := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 	logger = zerologr.New(&zeroLogger)
 
-	shutdown, err := instrumentation.SetupOTelSDK(ctx, serviceName, "", logger)
+	shutdown, err := instrumentation.SetupOTelSDKWithOptions(ctx, serviceName, "", logger)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup OTel SDK: %v", err))
 	}

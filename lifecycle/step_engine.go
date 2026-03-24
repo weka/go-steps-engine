@@ -165,6 +165,11 @@ type StateKeeper interface {
 	SupportsRunningState() bool
 }
 
+type stepEngineLogger interface {
+	SetValues(keysAndValues ...any)
+	SetError(err error, msg string, keysAndValues ...any)
+}
+
 type StepsEngine struct {
 	StateKeeper StateKeeper
 	Throttler   throttling.Throttler
@@ -174,22 +179,23 @@ type StepsEngine struct {
 }
 
 func (r *StepsEngine) Run(ctx context.Context) error {
-	var end func()
-	var runLogger *instrumentation.SpanLogger
+	var runLogger stepEngineLogger
 	if r.StateKeeper != nil {
 		var keysAndValues []any
 		for k, v := range r.StateKeeper.GetSummaryAttributes() {
 			keysAndValues = append(keysAndValues, k, v)
 		}
 
-		ctx, runLogger, end = instrumentation.GetLogSpan(ctx, "ReconciliationSteps", keysAndValues...)
-		defer end()
+		var spanLogger *instrumentation.SpanLogger
+		ctx, spanLogger = instrumentation.CreateLogSpan(ctx, "ReconciliationSteps", keysAndValues...)
+		defer spanLogger.End()
+		runLogger = spanLogger
 	} else {
-		ctx, runLogger, end = instrumentation.GetLogSpan(ctx, "")
-		defer end()
+		runLogger = instrumentation.CurrentSpanLogger(ctx)
 	}
 
 	var stepEnd func()
+
 STEPS:
 	for _, step := range r.Steps {
 		if step.HasNestedSteps() {
@@ -241,9 +247,9 @@ STEPS:
 			stepCtx = r.WithStepContext(stepCtx, step.GetName())
 		}
 
-		stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(stepCtx, step.GetName())
-		stepEnd = spanEnd
-		defer spanEnd() // in case we dont handle it will in terms of closing in for loop
+		stepCtx, stepLogger := instrumentation.CreateLogSpan(stepCtx, step.GetName())
+		stepEnd = stepLogger.End
+		defer stepLogger.End() // in case we dont handle it will in terms of closing in for loop
 
 		// Mark the step as running (if it has state and the StateKeeper supports running states)
 		if step.HasState() && r.StateKeeper != nil && r.StateKeeper.SupportsRunningState() {
@@ -355,8 +361,7 @@ STEPS:
 }
 
 func (r *StepsEngine) RunAsReconcilerResponse(ctx context.Context) (ctrl.Result, error) {
-	ctx, logger, end := instrumentation.GetLogSpan(ctx, "")
-	defer end()
+	logger := instrumentation.CurrentSpanLogger(ctx)
 
 	err := r.Run(ctx)
 	if err != nil {

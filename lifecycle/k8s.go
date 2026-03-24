@@ -82,8 +82,8 @@ func (o *K8sObject) SupportsRunningState() bool {
 }
 
 func (o *K8sObject) setConditions(ctx context.Context, condition metav1.Condition) error {
-	ctx, _, end := instrumentation.GetLogSpan(ctx, "setConditions", "condition", condition.Type)
-	defer end()
+	ctx, spanLogger := instrumentation.CreateLogSpan(ctx, "setConditions", "condition", condition.Type)
+	defer spanLogger.End()
 
 	meta.SetStatusCondition(o.Conditions, condition)
 	if err := o.Client.Status().Update(ctx, o.Object); err != nil {
@@ -138,8 +138,7 @@ func stepStateToK8sCondition(state StepState) metav1.Condition {
 }
 
 func RunAsReconcilerResponse(ctx context.Context, stepsEngine *StepsEngine) (ctrl.Result, error) {
-	ctx, logger, end := instrumentation.GetLogSpan(ctx, "")
-	defer end()
+	logger := instrumentation.CurrentSpanLogger(ctx)
 
 	err := stepsEngine.Run(ctx)
 	if err != nil {
