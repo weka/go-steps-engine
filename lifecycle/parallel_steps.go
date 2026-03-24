@@ -124,8 +124,8 @@ func (s *ParallelSteps) ValidateParallelSteps() error {
 }
 
 func (s *ParallelSteps) RunStep(ctx context.Context) error {
-	ctx, _, end := instrumentation.GetLogSpan(ctx, "RunParallelSteps", "parallel_steps_group", s.Name)
-	defer end()
+	ctx, spanLogger := instrumentation.CreateLogSpan(ctx, "RunParallelSteps", "parallel_steps_group", s.Name)
+	defer spanLogger.End()
 
 	if err := s.ValidateParallelSteps(); err != nil {
 		return err
@@ -135,8 +135,8 @@ func (s *ParallelSteps) RunStep(ctx context.Context) error {
 	errs := make(chan error, len(s.Steps))
 	for _, step := range s.Steps {
 		go func(ctx context.Context, step Step) {
-			stepCtx, stepLogger, spanEnd := instrumentation.GetLogSpan(ctx, step.GetName())
-			defer spanEnd()
+			stepCtx, stepLogger := instrumentation.CreateLogSpan(ctx, step.GetName())
+			defer stepLogger.End()
 
 			// Check preconditions
 			for _, predicate := range step.GetPredicates() {

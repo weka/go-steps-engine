@@ -22,7 +22,7 @@ func SetupLogging(ctx context.Context) (logger logr.Logger, shutdown func(contex
 	zeroLogger := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 	logger = zerologr.New(&zeroLogger)
 
-	shutdown, err := instrumentation.SetupOTelSDK(ctx, "weka-k8s-testing-unittests", "", logger)
+	shutdown, err := instrumentation.SetupOTelSDKWithOptions(ctx, "weka-k8s-testing-unittests", "", logger)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup OTel SDK: %v", err))
 	}
