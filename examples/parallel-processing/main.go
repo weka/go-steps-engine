@@ -52,7 +52,7 @@ func main() {
 	ctx := context.Background()
 
 	// Setup logging and OpenTelemetry
-	_, shutdown := shared.SetupLogging(ctx, "weka-parallel-processing-example")
+	ctx, shutdown := shared.SetupLogging(ctx, "weka-parallel-processing-example")
 	defer func() {
 		if err := shutdown(ctx); err != nil {
 			log.Printf("Failed to shutdown OTel SDK: %v", err)
