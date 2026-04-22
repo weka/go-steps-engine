@@ -7,20 +7,22 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
 	"github.com/rs/zerolog"
 	"github.com/weka/go-weka-observability/instrumentation"
+	"github.com/weka/go-weka-observability/logger"
 )
 
 // SetupLogging configures logging and OpenTelemetry for examples.
 // It returns a logger and a shutdown function that should be called when the example completes.
-func SetupLogging(ctx context.Context, serviceName string) (logger logr.Logger, shutdown func(context.Context) error) {
+func SetupLogging(ctx context.Context, serviceName string) (ctxNew context.Context, shutdown func(context.Context) error) {
 	writer := zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.TimeOnly}
 	zeroLogger := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
-	logger = zerologr.New(&zeroLogger)
+	logr := zerologr.New(&zeroLogger)
 
-	shutdown, err := instrumentation.SetupOTelSDKWithOptions(ctx, serviceName, "", logger)
+	ctxNew = logger.ContextWithLogr(ctx, logr)
+
+	shutdown, err := instrumentation.SetupOTelSDKWithOptions(ctxNew, serviceName, "", logr)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup OTel SDK: %v", err))
 	}

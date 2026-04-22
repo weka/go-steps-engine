@@ -12,6 +12,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -171,7 +172,7 @@ func (r *CustomResourceReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 func main() {
 	// Setup logging and OpenTelemetry
 	ctx := context.Background()
-	_, shutdown := shared.SetupLogging(ctx, "weka-k8s-controller-example")
+	ctx, shutdown := shared.SetupLogging(ctx, "weka-k8s-controller-example")
 	defer func() {
 		if err := shutdown(ctx); err != nil {
 			fmt.Printf("Failed to shutdown OTel SDK: %v\n", err)
@@ -181,6 +182,7 @@ func main() {
 	// Create a fake Kubernetes client for demonstration
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
+	scheme.AddKnownTypes(schema.GroupVersion{Group: "example.com", Version: "v1"}, &CustomResource{})
 
 	// Create a sample CustomResource
 	customResource := &CustomResource{
@@ -200,6 +202,7 @@ func main() {
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
+		WithStatusSubresource(customResource).
 		WithRuntimeObjects(customResource).
 		Build()
 

@@ -19,7 +19,7 @@ func main() {
 	ctx := context.Background()
 
 	// Setup logging and OpenTelemetry
-	_, shutdown := shared.SetupLogging(ctx, "weka-basic-workflow-example")
+	ctx, shutdown := shared.SetupLogging(ctx, "weka-basic-workflow-example")
 	defer func() {
 		if err := shutdown(ctx); err != nil {
 			log.Printf("Failed to shutdown OTel SDK: %v", err)
