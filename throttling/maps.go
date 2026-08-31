@@ -28,3 +28,13 @@ func (tsm *TypedSyncMap[K, V]) LoadOrStore(key K, value V) (V, bool) {
 	}
 	return value, false
 }
+
+func (tsm *TypedSyncMap[K, V]) Delete(key K) {
+	tsm.m.Delete(key)
+}
+
+func (tsm *TypedSyncMap[K, V]) Range(f func(K, V) bool) {
+	tsm.m.Range(func(key, value any) bool {
+		return f(key.(K), value.(V))
+	})
+}
