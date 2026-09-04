@@ -39,6 +39,8 @@ type DynamicStep struct {
 	// fields to pass to the nested steps engine
 	StateKeeper StateKeeper
 	Throttler   throttling.Throttler
+	// WithStepContext is propagated from the parent engine (see stepContextReceiver).
+	WithStepContext func(ctx context.Context, stepName string) context.Context
 }
 
 func (s *DynamicStep) getStep() Step {
@@ -140,6 +142,12 @@ func (s *DynamicStep) GetNestedSteps() []Step {
 	return nil
 }
 
+// SetStepContextFunc receives the parent engine's per-step context enhancer so the sub-engine
+// this step runs applies it to its own steps too (see stepContextReceiver).
+func (s *DynamicStep) SetStepContextFunc(f func(ctx context.Context, stepName string) context.Context) {
+	s.WithStepContext = f
+}
+
 func (s *DynamicStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
 	s.StateKeeper = stateKeeper
 	s.Throttler = throttler
@@ -152,9 +160,11 @@ func (s *DynamicStep) SetStateKeeperAndThrottler(stateKeeper StateKeeper, thrott
 
 func (s *DynamicStep) RunStep(ctx context.Context) error {
 	reconSteps := StepsEngine{
-		Steps:       []Step{s.getStep()},
-		StateKeeper: s.StateKeeper,
-		Throttler:   s.Throttler,
+		Steps:           []Step{s.getStep()},
+		StateKeeper:     s.StateKeeper,
+		Throttler:       s.Throttler,
+		WithStepContext: s.WithStepContext,
+		Nested:          true,
 	}
 	return reconSteps.Run(ctx)
 }
