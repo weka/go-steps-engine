@@ -170,17 +170,27 @@ type stepEngineLogger interface {
 	SetError(err error, msg string, keysAndValues ...any)
 }
 
+// stepContextReceiver is implemented by nested-step types that run a sub-engine and therefore
+// need the caller's per-step context enhancer passed down to it. A narrow optional interface, so
+// Step implementations outside this package are unaffected.
+type stepContextReceiver interface {
+	SetStepContextFunc(func(ctx context.Context, stepName string) context.Context)
+}
+
 type StepsEngine struct {
 	StateKeeper StateKeeper
 	Throttler   throttling.Throttler
 	Steps       []Step
 	// Optional context enhancer function (per step)
 	WithStepContext func(ctx context.Context, stepName string) context.Context
+	// Nested marks a sub-engine run from inside a step. The parent engine already opened a span
+	// for that step, so the run-level span is suppressed to avoid a duplicate level in traces.
+	Nested bool
 }
 
 func (r *StepsEngine) Run(ctx context.Context) error {
 	var runLogger stepEngineLogger
-	if r.StateKeeper != nil {
+	if r.StateKeeper != nil && !r.Nested {
 		var keysAndValues []any
 		for k, v := range r.StateKeeper.GetSummaryAttributes() {
 			keysAndValues = append(keysAndValues, k, v)
@@ -200,6 +210,9 @@ STEPS:
 	for _, step := range r.Steps {
 		if step.HasNestedSteps() {
 			step.SetStateKeeperAndThrottler(r.StateKeeper, r.Throttler)
+			if receiver, ok := step.(stepContextReceiver); ok {
+				receiver.SetStepContextFunc(r.WithStepContext)
+			}
 		}
 
 		// setValues does not seem to affect span.
@@ -244,7 +257,14 @@ STEPS:
 
 		stepCtx := ctx
 		if r.WithStepContext != nil {
-			stepCtx = r.WithStepContext(stepCtx, step.GetName())
+			// Prefer the step-state name: it is the caller's unique identifier for the step (a
+			// dot-path, say), whereas Name is the display name also used for the span below.
+			// Falls back to Name when the step sets no state name.
+			stepName := step.GetStepStateName()
+			if stepName == "" {
+				stepName = step.GetName()
+			}
+			stepCtx = r.WithStepContext(stepCtx, stepName)
 		}
 
 		stepCtx, stepLogger := instrumentation.CreateLogSpan(stepCtx, step.GetName())

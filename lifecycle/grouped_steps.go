@@ -37,6 +37,8 @@ type GroupedSteps struct {
 	// fields to pass to the nested steps engine
 	StateKeeper StateKeeper
 	Throttler   throttling.Throttler
+	// WithStepContext is propagated from the parent engine (see stepContextReceiver).
+	WithStepContext func(ctx context.Context, stepName string) context.Context
 }
 
 func (s *GroupedSteps) GetName() string {
@@ -123,6 +125,12 @@ func (s *GroupedSteps) GetNestedSteps() []Step {
 	return s.Steps
 }
 
+// SetStepContextFunc receives the parent engine's per-step context enhancer so the sub-engine
+// this step runs applies it to its own steps too (see stepContextReceiver).
+func (s *GroupedSteps) SetStepContextFunc(f func(ctx context.Context, stepName string) context.Context) {
+	s.WithStepContext = f
+}
+
 func (s *GroupedSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throttler throttling.Throttler) {
 	s.StateKeeper = stateKeeper
 	s.Throttler = throttler
@@ -135,9 +143,11 @@ func (s *GroupedSteps) SetStateKeeperAndThrottler(stateKeeper StateKeeper, throt
 
 func (s *GroupedSteps) RunStep(ctx context.Context) error {
 	reconSteps := StepsEngine{
-		Steps:       s.Steps,
-		StateKeeper: s.StateKeeper,
-		Throttler:   s.Throttler,
+		Steps:           s.Steps,
+		StateKeeper:     s.StateKeeper,
+		Throttler:       s.Throttler,
+		WithStepContext: s.WithStepContext,
+		Nested:          true,
 	}
 	return reconSteps.Run(ctx)
 }
