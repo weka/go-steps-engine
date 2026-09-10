@@ -234,3 +234,45 @@ func TestGroupedStepsWithState(t *testing.T) {
 	}
 	assert.Equal(t, "fallback-group", groupedStepsNoStateName.GetStepStateName())
 }
+
+// TestWithStepContextOnlyForStatedSteps ensures WithStepContext is invoked only for steps that
+// have a state name, and that stateless steps nested at run time (no State set) do not leak their
+// bare names into WithStepContext - they should run in the context inherited from their parent.
+func TestWithStepContextOnlyForStatedSteps(t *testing.T) {
+	ctx := context.Background()
+
+	_, shutdown := SetupLogging(ctx)
+	defer shutdown(ctx)
+
+	mockSuccess := &MockSuccess{}
+	mockStateKeeper := NewMockStateKeeper()
+
+	var recordedNames []string
+
+	stepsEngine := StepsEngine{
+		StateKeeper: mockStateKeeper,
+		WithStepContext: func(ctx context.Context, stepName string) context.Context {
+			recordedNames = append(recordedNames, stepName)
+			return ctx
+		},
+		Steps: []Step{
+			&SimpleStep{
+				Name:  "leaf",
+				State: &State{Name: "leaf"},
+				Run:   mockSuccess.Run,
+			},
+			&GroupedSteps{
+				Name:  "group",
+				State: &State{Name: "group"},
+				Steps: []Step{
+					&SimpleStep{Name: "child1", Run: mockSuccess.Run},
+					&SimpleStep{Name: "child2", Run: mockSuccess.Run},
+				},
+			},
+		},
+	}
+
+	err := stepsEngine.Run(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"leaf", "group"}, recordedNames)
+}
