@@ -255,16 +255,14 @@ STEPS:
 			}
 		}
 
+		// WithStepContext receives the step-state name: the caller's identity key for the step
+		// (a dot-path, say). Steps without State have no identity and are not passed to it; they
+		// run in the context they inherited, which for nested engines is the parent step's context.
 		stepCtx := ctx
 		if r.WithStepContext != nil {
-			// Prefer the step-state name: it is the caller's unique identifier for the step (a
-			// dot-path, say), whereas Name is the display name also used for the span below.
-			// Falls back to Name when the step sets no state name.
-			stepName := step.GetStepStateName()
-			if stepName == "" {
-				stepName = step.GetName()
+			if stepName := step.GetStepStateName(); stepName != "" {
+				stepCtx = r.WithStepContext(stepCtx, stepName)
 			}
-			stepCtx = r.WithStepContext(stepCtx, stepName)
 		}
 
 		stepCtx, stepLogger := instrumentation.CreateLogSpan(stepCtx, step.GetName())
