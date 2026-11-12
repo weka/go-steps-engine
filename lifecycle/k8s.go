@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,42 +137,5 @@ func stepStateToK8sCondition(state StepState) metav1.Condition {
 }
 
 func RunAsReconcilerResponse(ctx context.Context, stepsEngine *StepsEngine) (ctrl.Result, error) {
-	logger := instrumentation.CurrentSpanLogger(ctx)
-
-	err := stepsEngine.Run(ctx)
-	if err != nil {
-		// check if the error is WaitError or AbortError, then return without error, but with 3 seconds wait
-		var lastUnpacked *StepRunError
-		var unpackTarget error
-		unpackTarget = err
-		for {
-			unpacked, ok := unpackTarget.(*StepRunError)
-			if !ok {
-				if lastUnpacked == nil {
-					break
-				}
-				if waitError, ok := lastUnpacked.Err.(*WaitError); ok {
-					logger.Info("waiting for conditions to be met", "error", err)
-					sleepDuration := 3 * time.Second
-					if waitError.Duration > 0 {
-						sleepDuration = waitError.Duration
-					}
-					return ctrl.Result{RequeueAfter: sleepDuration}, nil
-				}
-				if _, ok := lastUnpacked.Err.(*AbortedByPredicate); ok {
-					logger.Info("aborted by predicate", "error", err)
-					return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
-				}
-
-				break
-			} else {
-				lastUnpacked = unpacked
-				unpackTarget = unpacked.Err
-			}
-		}
-		logger.Error(err, "Error processing reconciliation steps")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	}
-	logger.Info("Reconciliation steps completed successfully")
-	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil // Never fully abort
+	return ResultFor(ctx, stepsEngine.Run(ctx)), nil
 }

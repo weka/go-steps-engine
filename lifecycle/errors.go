@@ -20,6 +20,8 @@ func (w WaitError) Error() string {
 	return "wait-error:" + w.Err.Error()
 }
 
+func (w WaitError) Unwrap() error { return w.Err }
+
 func NewWaitError(err error) error {
 	return &WaitError{Err: err}
 }
@@ -46,6 +48,8 @@ func (e StepRunError) Error() string {
 			e.Err)
 	}
 }
+
+func (e StepRunError) Unwrap() error { return e.Err }
 
 type ConditionUpdateError struct {
 	Err       error
