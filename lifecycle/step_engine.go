@@ -379,41 +379,42 @@ STEPS:
 }
 
 func (r *StepsEngine) RunAsReconcilerResponse(ctx context.Context) (ctrl.Result, error) {
-	logger := instrumentation.CurrentSpanLogger(ctx)
+	return ResultFor(ctx, r.Run(ctx)), nil
+}
 
-	err := r.Run(ctx)
-	if err != nil {
-		// check if the error is WaitError or AbortError, then return without error, but with 3 seconds wait
-		var lastUnpacked *StepRunError
-		var unpackTarget error
-		unpackTarget = err
-		for {
-			unpacked, ok := unpackTarget.(*StepRunError)
-			if !ok {
-				if lastUnpacked == nil {
-					break
-				}
-				if waitError, ok := lastUnpacked.Err.(*WaitError); ok {
-					logger.Info("waiting for conditions to be met", "error", err)
-					sleepDuration := 3 * time.Second
-					if waitError.Duration > 0 {
-						sleepDuration = waitError.Duration
-					}
-					return ctrl.Result{RequeueAfter: sleepDuration}, nil
-				}
-				if _, ok := lastUnpacked.Err.(*AbortedByPredicate); ok {
-					logger.Info("aborted by predicate", "error", err)
-					return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
-				}
-				break
-			} else {
-				lastUnpacked = unpacked
-				unpackTarget = unpacked.Err
-			}
-		}
-		logger.SetError(err, "Error processing reconciliation steps")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+// ResultFor maps the outcome of StepsEngine.Run to a reconcile result.
+func ResultFor(ctx context.Context, err error) ctrl.Result {
+	logger := instrumentation.CurrentSpanLogger(ctx)
+	if err == nil {
+		logger.Info("Reconciliation steps completed successfully")
+		return ctrl.Result{RequeueAfter: 30 * time.Second} // Never fully abort
 	}
-	logger.Info("Reconciliation steps completed successfully")
-	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil // Never fully abort
+	// check if the error is WaitError or AbortError, then return without error, but with 3 seconds wait
+	var lastUnpacked *StepRunError
+	unpackTarget := err
+	for {
+		unpacked, ok := unpackTarget.(*StepRunError)
+		if !ok {
+			if lastUnpacked == nil {
+				break
+			}
+			if waitError, ok := lastUnpacked.Err.(*WaitError); ok {
+				logger.Info("waiting for conditions to be met", "error", err)
+				sleepDuration := 3 * time.Second
+				if waitError.Duration > 0 {
+					sleepDuration = waitError.Duration
+				}
+				return ctrl.Result{RequeueAfter: sleepDuration}
+			}
+			if _, ok := lastUnpacked.Err.(*AbortedByPredicate); ok {
+				logger.Info("aborted by predicate", "error", err)
+				return ctrl.Result{RequeueAfter: 3 * time.Second}
+			}
+			break
+		}
+		lastUnpacked = unpacked
+		unpackTarget = unpacked.Err
+	}
+	logger.SetError(err, "Error processing reconciliation steps")
+	return ctrl.Result{RequeueAfter: 10 * time.Second}
 }
